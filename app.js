@@ -710,5 +710,5 @@ $('suStart').onclick=()=>{
 };
 function showApp(){
   $('setupView').style.display='none';
-  $('statusbar').style.display='flex'; $('tabs').style.display='flex'; $('bottombar').style.display='block';
+  $('statusbar').style.display='flex'; $('tabsScroll').style.display='block'; $('bottombar').style.display='block';
 }

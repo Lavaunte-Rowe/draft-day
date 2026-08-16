@@ -7,31 +7,36 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="hbar">
+<header>
+  <div class="hbar">
+    <div class="brand">
+      <span class="brand-mark">🏈</span>
       <div>
-        <h1>🏈 Draft Day</h1>
+        <h1>Draft Day</h1>
         <div class="sub" id="subhdr" title="Rankings/ADP are consensus, manually compiled July 2026 — not a live feed. Injury/depth data is live.">2026 · PPR · consensus rankings</div>
-        <div class="sub" id="enrichBadge" style="margin-top:1px"></div>
+        <div class="sub" id="enrichBadge"></div>
       </div>
-      <div class="spacer"></div>
-      <button class="iconbtn" id="undoBtn">↩ Undo</button>
-      <button class="iconbtn" id="setBtn">⚙</button>
     </div>
-    <div class="statusbar" id="statusbar" style="display:none">
-      <div class="stat"><div class="v" id="stRound">–</div><div class="l">Round</div></div>
-      <div class="stat"><div class="v tap" id="stPick" title="Tap to correct pick #">–</div><div class="l">Overall pick</div></div>
-      <div class="stat" id="stClockBox"><div class="v" id="stClock">–</div><div class="l" id="stClockLab">On the clock</div></div>
-      <div class="stat"><div class="v" id="stNext">–</div><div class="l">Your next</div></div>
-    </div>
-    <div class="tabs" id="tabs" style="display:none">
+    <div class="spacer"></div>
+    <button class="iconbtn" id="undoBtn" aria-label="Undo">↩</button>
+    <button class="iconbtn" id="setBtn" aria-label="Settings">⚙</button>
+  </div>
+  <div class="statusbar" id="statusbar" style="display:none">
+    <div class="stat"><div class="v" id="stRound">–</div><div class="l">Round</div></div>
+    <div class="stat"><div class="v tap" id="stPick" title="Tap to correct pick #">–</div><div class="l">Overall pick</div></div>
+    <div class="stat" id="stClockBox"><div class="v" id="stClock">–</div><div class="l" id="stClockLab">On the clock</div></div>
+    <div class="stat"><div class="v" id="stNext">–</div><div class="l">Your next</div></div>
+  </div>
+  <div class="tabs-scroll" id="tabsScroll" style="display:none">
+    <div class="tabs" id="tabs">
       <button class="tab active" data-tab="draft">Draft</button>
       <button class="tab" data-tab="queue">Queue <span id="qCount" class="qcount" style="display:none">0</span></button>
       <button class="tab" data-tab="team">My team</button>
       <button class="tab" data-tab="log">Log</button>
     </div>
-  </header>
+  </div>
+</header>
+<div class="wrap">
   <!-- SETUP -->
   <div id="setupView" class="setup">
     <h2>League setup</h2>
