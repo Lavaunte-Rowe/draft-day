@@ -19,6 +19,16 @@ async function loadEnrichment(){
     if(!res.ok) throw new Error('bad status '+res.status);
     const data = await res.json();
     ENRICH = data.players || {};
+    // Live ADP feeds the value calc (and the ADP number shown in the UI) for
+    // players FFC has real draft volume on. Tiers and positional rank (pr)
+    // are computed/curated separately and are never touched here.
+    for(const p of PLAYERS){
+      const e = ENRICH[p.id];
+      if(e && typeof e.live_adp === 'number'){
+        if(p._consensusAdp === undefined) p._consensusAdp = p.adp;
+        p.adp = e.live_adp;
+      }
+    }
     if(badge) badge.textContent = '· live data synced';
   }catch(e){
     console.warn('Live player data unavailable — falling back to consensus rankings only.', e);
@@ -52,6 +62,8 @@ function avatarHtml(p, size){
   return `<div class="${cls}" style="--ring:${color}">${fb}${img}</div>`;
 }
 const ADP_TOOLTIP='Consensus ranking, manually compiled July 2026 — not a live feed.';
+const LIVE_ADP_TOOLTIP='Live ADP from real drafts, updated daily (Fantasy Football Calculator). Tier and positional rank stay on the curated consensus.';
+function adpTooltip(id){ const e=ENRICH[id]; return (e && typeof e.live_adp==='number') ? LIVE_ADP_TOOLTIP : ADP_TOOLTIP; }
 const INJURY_LABELS={Q:'Questionable', D:'Doubtful', O:'Out', IR:'Injured Reserve', PUP:'PUP', SUSP:'Suspended', NA:'Not Active'};
 function injuryBadgeHtml(id){
   const e=ENRICH[id];
@@ -234,7 +246,7 @@ function pcardInfoHtml(p, opts){
   const bye = p.b ? `Bye ${p.b}` : 'FA';
   const chipsHtml = opts.chips ? `<div class="pcard-chips">${opts.chips}</div>` : '';
   return `<div class="pcard-name">${p.n}${opts.nameExtra||''}${injuryBadgeHtml(p.id)}</div>
-    <div class="pcard-meta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · <span title="${ADP_TOOLTIP}">ADP ${p.adp}</span> · <span class="tierb">Tier ${tiers[p.id]}</span></div>
+    <div class="pcard-meta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · <span title="${adpTooltip(p.id)}">ADP ${p.adp}</span> · <span class="tierb">Tier ${tiers[p.id]}</span></div>
     ${chipsHtml}`;
 }
 function queueStarHtml(id){ return inQueue(id) ? ' <span style="color:var(--queue)">★</span>' : ''; }
@@ -413,7 +425,7 @@ function openPlayer(id){
     </div>
     <div class="pd-facts">
       <div class="fact"><div class="v">#${p.id}</div><div class="l">Rank</div></div>
-      <div class="fact" title="${ADP_TOOLTIP}"><div class="v">${p.adp}</div><div class="l">ADP</div></div>
+      <div class="fact" title="${adpTooltip(p.id)}"><div class="v">${p.adp}</div><div class="l">ADP</div></div>
       <div class="fact"><div class="v">${tiers[p.id]}</div><div class="l">Tier</div></div>
       <div class="fact"><div class="v">${p.b||'—'}</div><div class="l">Bye</div></div>
     </div>
@@ -496,7 +508,7 @@ function openCompare(){
     `<div class="cmp-cell lab"></div>`+info.map(x=>
       `<div class="cmp-cell head" style="display:flex; flex-direction:column; align-items:center; gap:4px">${avatarHtml(x.p,'sm')}<div>${x.p.n}</div><span class="sub"><span class="posbadge ${posColor(x.p.p)}">${x.p.p}${x.p.pr}</span>${x.p.t}${x.st?(x.st==='mine'?' · MINE':' · GONE'):''}</span></div>`).join('')
     +rowH(`<span title="${ADP_TOOLTIP}">Consensus</span>`, info.map(x=>x.p.id), -1)
-    +rowH(`<span title="${ADP_TOOLTIP}">ADP</span>`, info.map(x=>x.p.adp), -1)
+    +rowH(`<span title="${info.every(x=>ENRICH[x.p.id]&&typeof ENRICH[x.p.id].live_adp==='number')?LIVE_ADP_TOOLTIP:ADP_TOOLTIP}">ADP</span>`, info.map(x=>x.p.adp), -1)
     +rowH('Tier', info.map(x=>tiers[x.p.id]), -1)
     +rowH('Bye', info.map(x=>x.p.b||null), 0, info.map(x=>x.p.b&&myByes[x.p.b]?`⚠ ${myByes[x.p.b]} of yours`:''))
     +rowH('Injury', info.map(x=>{ const e=ENRICH[x.p.id]; return e?(e.injury_status||'Active'):null; }), 0)
