@@ -27,7 +27,7 @@
   input:focus,select:focus{outline:2px solid var(--accent2); outline-offset:1px;}
   .wrap{max-width:760px; margin:0 auto; padding:var(--sp-4) 10px 90px;}
   @keyframes viewIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
-  #draftView, #boardView, #queueView, #teamView, #logView{ animation:viewIn var(--dur-med) var(--ease); }
+  #draftView, #boardView, #queueView, #teamView, #logView, #notesView, #authView{ animation:viewIn var(--dur-med) var(--ease); }
   /* header */
   header{position:sticky; top:0; z-index:50; background:rgba(19,25,35,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line);}
@@ -233,6 +233,8 @@
   .setup{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px 16px; margin-top:16px;}
   .setup h2{font-size:18px; margin:0 0 4px; text-transform:none; letter-spacing:0; color:var(--text);}
   .setup p{color:var(--dim); font-size:13.5px; margin:4px 0 12px;}
+  .setup label{display:block; font-size:12px; color:var(--dim); margin:12px 0 4px; text-transform:uppercase; letter-spacing:.5px;}
+  .setup input[type=email],.setup input[type=password]{width:100%;}
   /* draft board grid */
   .dbwrap{overflow:auto; max-height:72vh; border:1px solid var(--line); border-radius:var(--r-md);
     background:var(--line); -webkit-overflow-scrolling:touch;}

@@ -41,6 +41,105 @@ async function loadEnrichment(){
   }
 }
 loadEnrichment();
+/* ---------- cloud sync (Supabase) ---------- */
+const cloudConfigured = typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && !/YOUR-PROJECT/.test(SUPABASE_URL);
+const sb = cloudConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+let cloudUser = null;
+let cloudReady = false;   // true once the initial cloud load/restore attempt has finished
+let notesText = '';
+let saveTimer = null;
+function scheduleCloudSave(){
+  if(!sb || !cloudUser || !cloudReady) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToCloud, 900);
+}
+async function saveToCloud(){
+  if(!sb || !cloudUser) return;
+  try{
+    await sb.from('app_state').upsert({
+      user_id: cloudUser.id,
+      draft_state: {...S, ui:undefined},
+      notes: notesText,
+      updated_at: new Date().toISOString(),
+    });
+  }catch(e){ console.warn('Cloud save failed', e); }
+}
+async function loadFromCloud(){
+  if(!sb || !cloudUser) return;
+  try{
+    const {data, error} = await sb.from('app_state').select('draft_state, notes').eq('user_id', cloudUser.id).maybeSingle();
+    if(error) throw error;
+    if(data){
+      if(data.draft_state && Array.isArray(data.draft_state.actions)){
+        S = {...S, ...data.draft_state, ui:S.ui};
+        rebuildStatus();
+      }
+      notesText = data.notes || '';
+    }
+  }catch(e){ console.warn('Cloud load failed', e); }
+}
+function showAuthView(){
+  $('authView').style.display='block';
+  $('setupView').style.display='none';
+  $('statusbar').style.display='none'; $('tabsScroll').style.display='none';
+  $('bottombar').style.display='none'; $('chatbar').style.display='none';
+}
+async function onSignedIn(user){
+  cloudUser = user;
+  $('authView').style.display='none';
+  $('mSignOutRow').style.display='block';
+  await loadFromCloud();
+  cloudReady = true;
+  if(S.started){ showApp(); renderAll(); }
+  else { $('setupView').style.display='block'; }
+}
+function initCloudAuth(){
+  if(!cloudConfigured){ cloudReady = true; return; }
+  $('setupView').style.display='none';
+  sb.auth.getSession().then(({data})=>{
+    if(data.session) onSignedIn(data.session.user);
+    else showAuthView();
+  });
+  sb.auth.onAuthStateChange((event)=>{
+    if(event==='SIGNED_OUT'){ cloudUser=null; cloudReady=false; }
+  });
+  let authMode='signin';
+  $('authToggle').onclick=(e)=>{
+    e.preventDefault();
+    authMode = authMode==='signin' ? 'signup' : 'signin';
+    $('authSubmit').textContent = authMode==='signin' ? 'Sign in' : 'Create account';
+    $('authTitle').textContent = authMode==='signin' ? 'Sign in' : 'Create account';
+    $('authToggle').textContent = authMode==='signin' ? 'Need an account? Sign up' : 'Have an account? Sign in';
+    $('authMsg').textContent='';
+  };
+  $('authSubmit').onclick=async()=>{
+    const email=$('authEmail').value.trim(); const password=$('authPassword').value;
+    if(!email||!password){ $('authMsg').textContent='Enter email and password.'; return; }
+    $('authSubmit').disabled=true; $('authMsg').textContent='';
+    try{
+      const {data, error} = authMode==='signin'
+        ? await sb.auth.signInWithPassword({email,password})
+        : await sb.auth.signUp({email,password});
+      if(error) throw error;
+      if(authMode==='signup' && !data.session){
+        $('authMsg').style.color='var(--me)';
+        $('authMsg').textContent='Account created — check your email to confirm, then sign in.';
+        return;
+      }
+      await onSignedIn(data.session.user);
+    }catch(e){
+      $('authMsg').style.color='var(--warn)';
+      $('authMsg').textContent = e.message || 'Something went wrong.';
+    }finally{
+      $('authSubmit').disabled=false;
+    }
+  };
+  $('mSignOut').onclick=async()=>{
+    if(!confirm('Sign out?')) return;
+    await sb.auth.signOut();
+    location.reload();
+  };
+}
 /* ---------- avatars & team logos ---------- */
 function initials(name){
   const parts=(name||'').replace(/[^a-zA-Z' -]/g,'').split(/\s+/).filter(Boolean);
@@ -362,7 +461,7 @@ function renderQueue(){
     d.querySelector('.qord').onclick=e=>{
       const b=e.target.closest('button'); if(!b||b.disabled)return;
       const j=i+Number(b.dataset.d);
-      [S.queue[i],S.queue[j]]=[S.queue[j],S.queue[i]]; renderQueue();
+      [S.queue[i],S.queue[j]]=[S.queue[j],S.queue[i]]; renderQueue(); scheduleCloudSave();
     };
     const actions=d.querySelector('.pcard-actions');
     if(!st){
@@ -603,6 +702,10 @@ function renderLog(){
       <div class="empty-sub">Every pick will show up here as the draft goes.</div>
     </div>`;
 }
+function renderNotes(){
+  const ta=$('notesText');
+  if(document.activeElement!==ta) ta.value=notesText;
+}
 function renderDraftBoard(){
   const el=$('dbGrid');
   el.style.gridTemplateColumns=`34px repeat(${S.teams},1fr)`;
@@ -640,6 +743,7 @@ function renderAll(){
   $('queueView').style.display = t==='queue'?'block':'none';
   $('teamView').style.display = t==='team'?'block':'none';
   $('logView').style.display = t==='log'?'block':'none';
+  $('notesView').style.display = t==='notes'?'block':'none';
   $('buddyView').style.display = t==='buddy'?'block':'none';
   $('bottombar').style.display = (S.started && t!=='buddy') ? 'block':'none';
   $('chatbar').style.display = (S.started && t==='buddy') ? 'block':'none';
@@ -652,7 +756,9 @@ function renderAll(){
   if(t==='queue') renderQueue();
   if(t==='team') renderTeam();
   if(t==='log') renderLog();
+  if(t==='notes') renderNotes();
   if(t==='buddy') renderChat();
+  scheduleCloudSave();
 }
 /* ---------- actions ---------- */
 function mark(id, kind){
@@ -843,6 +949,7 @@ $('stPick').onclick=()=>{
 };
 /* ---------- ui wiring ---------- */
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ S.ui.tab=b.dataset.tab; renderAll(); });
+$('notesText').oninput=e=>{ notesText=e.target.value; scheduleCloudSave(); };
 $('search').oninput=e=>{ S.ui.search=e.target.value; S.ui.shown=50; renderBoard(); };
 $('toggleDrafted').onclick=()=>{ S.ui.hideDrafted=!S.ui.hideDrafted;
   $('toggleDrafted').textContent=S.ui.hideDrafted?'Hide drafted':'Show all'; renderBoard(); };
@@ -870,3 +977,4 @@ function showApp(){
   $('setupView').style.display='none';
   $('statusbar').style.display='flex'; $('tabsScroll').style.display='block'; $('bottombar').style.display='block';
 }
+initCloudAuth();
