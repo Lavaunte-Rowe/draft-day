@@ -90,6 +90,7 @@ function myPickNumbers(){ const out=[];
   return out; }
 function nextMyPicks(n){ return myPickNumbers().filter(x=>x>=S.pick).slice(0,n); }
 function totalPicks(){ return S.teams*S.rounds; }
+function pickForRoundTeam(r,t){ const p=(r%2===1)?t:(S.teams-t+1); return (r-1)*S.teams+p; }
 /* ---------- tiers (ADP-gap based, per position) ---------- */
 const tiers = {};
 (function(){
@@ -568,10 +569,40 @@ function renderLog(){
   });
   if(!S.actions.length) el.innerHTML='<div class="note">No picks yet.</div>';
 }
+function renderDraftBoard(){
+  const el=$('dbGrid');
+  el.style.gridTemplateColumns=`34px repeat(${S.teams},1fr)`;
+  let html='<div class="dbcell dbcorner"></div>';
+  for(let t=1;t<=S.teams;t++){
+    const mine=t===S.slot;
+    html+=`<div class="dbcell dbhead${mine?' dbmine':''}">${mine?'YOU':'T'+t}</div>`;
+  }
+  for(let r=1;r<=S.rounds;r++){
+    html+=`<div class="dbcell dbrnd">${r}</div>`;
+    for(let t=1;t<=S.teams;t++){
+      const mine=t===S.slot;
+      const pickNo=pickForRoundTeam(r,t);
+      const a=S.actions.find(x=>x.pick===pickNo);
+      if(a){
+        const p=PLAYERS.find(x=>x.id===a.id);
+        html+=`<div class="dbcell dbpick${mine?' dbmine':''}" data-id="${p.id}" title="${p.n} — pick #${a.pick}">
+            <span class="posbadge ${posColor(p.p)}">${p.p}</span>
+            <div class="dbname">${p.n.split(' ').slice(-1)[0]}</div>
+          </div>`;
+      } else {
+        const isClock = pickNo===S.pick && S.pick<=totalPicks();
+        html+=`<div class="dbcell dbempty${mine?' dbmine':''}${isClock?' dbclock':''}">${isClock?'●':'·'}</div>`;
+      }
+    }
+  }
+  el.innerHTML=html;
+  el.querySelectorAll('.dbpick').forEach(c=>{ c.onclick=()=>openPlayer(Number(c.dataset.id)); });
+}
 function renderAll(){
   renderStatus();
   const t=S.ui.tab;
   $('draftView').style.display = t==='draft'?'block':'none';
+  $('boardView').style.display = t==='board'?'block':'none';
   $('queueView').style.display = t==='queue'?'block':'none';
   $('teamView').style.display = t==='team'?'block':'none';
   $('logView').style.display = t==='log'?'block':'none';
@@ -580,6 +611,7 @@ function renderAll(){
   $('qCount').style.display = avail? 'inline-block':'none';
   $('qCount').textContent = avail;
   if(t==='draft'){ renderRecs(); renderBoard(); }
+  if(t==='board') renderDraftBoard();
   if(t==='queue') renderQueue();
   if(t==='team') renderTeam();
   if(t==='log') renderLog();

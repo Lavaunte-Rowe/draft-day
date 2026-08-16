@@ -201,3 +201,21 @@
   .setup{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px 16px; margin-top:16px;}
   .setup h2{font-size:18px; margin:0 0 4px; text-transform:none; letter-spacing:0; color:var(--text);}
   .setup p{color:var(--dim); font-size:13.5px; margin:4px 0 12px;}
+  /* draft board grid */
+  .dbwrap{overflow:auto; max-height:72vh; border:1px solid var(--line); border-radius:var(--r-md);
+    background:var(--line); -webkit-overflow-scrolling:touch;}
+  .dbgrid{display:grid; gap:1px;}
+  .dbcell{background:var(--panel); padding:6px 3px; text-align:center; font-size:11px; min-width:62px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:40px;}
+  .dbcorner{position:sticky; top:0; left:0; z-index:4; background:var(--panel2); min-width:34px;}
+  .dbhead{position:sticky; top:0; z-index:2; background:var(--panel2); font-weight:800; font-size:11px; color:var(--dim);}
+  .dbhead.dbmine{color:var(--me);}
+  .dbrnd{position:sticky; left:0; z-index:1; background:var(--panel2); font-weight:800; color:var(--dim); min-width:34px;}
+  .dbcell.dbmine{background:#a475f914;}
+  .dbpick{cursor:pointer; transition:background var(--dur-fast) var(--ease);}
+  .dbpick:active{background:var(--panel3);}
+  .dbpick .posbadge{margin:0; font-size:9.5px; padding:1px 5px;}
+  .dbname{font-size:9.5px; font-weight:700; margin-top:2px; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; max-width:58px; color:var(--text);}
+  .dbempty{color:var(--dim2); font-size:14px;}
+  .dbempty.dbclock{background:#4f8cff22; color:var(--accent2); font-weight:800;}
