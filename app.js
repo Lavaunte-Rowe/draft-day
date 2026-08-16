@@ -48,6 +48,12 @@ function avatarHtml(p, size){
     : '';
   return `<div class="${cls}" style="--ring:${color}">${fb}${img}</div>`;
 }
+const INJURY_LABELS={Q:'Questionable', D:'Doubtful', O:'Out', IR:'Injured Reserve', PUP:'PUP', SUSP:'Suspended', NA:'Not Active'};
+function injuryBadgeHtml(id){
+  const e=ENRICH[id];
+  if(!e||!e.injury_status) return '';
+  return ` <span class="injbadge ${e.injury_status}" title="${INJURY_LABELS[e.injury_status]||e.injury_status}">${e.injury_status}</span>`;
+}
 function teamLogoHtml(team){
   if(!team||team==='FA') return '';
   const color=TEAM_COLORS[team]||TEAM_COLORS.FA;
@@ -225,7 +231,7 @@ function playerRow(p, compact){
   row.innerHTML=`<div class="rnk">${p.id}</div>
     ${avatarHtml(p,'sm')}
     <div class="pinfo">
-      <div class="pname">${p.n}${inQueue(p.id)?' <span style="color:#f2cc60">★</span>':''}</div>
+      <div class="pname">${p.n}${inQueue(p.id)?' <span style="color:#f2cc60">★</span>':''}${injuryBadgeHtml(p.id)}</div>
       <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · ADP ${p.adp} · <span class="tierb">Tier ${tiers[p.id]}</span></div>
     </div>`;
   row.querySelector('.pinfo').onclick=()=>{
@@ -256,7 +262,7 @@ function renderRecs(){
     d.innerHTML=`<div class="recrank">${i+1}</div>
       ${avatarHtml(r.p)}
       <div class="recmain">
-        <div class="recname">${r.p.n}${inQueue(r.p.id)?' <span style="color:#f2cc60">★</span>':''}</div>
+        <div class="recname">${r.p.n}${inQueue(r.p.id)?' <span style="color:#f2cc60">★</span>':''}${injuryBadgeHtml(r.p.id)}</div>
         <div class="recmeta"><span class="posbadge ${posColor(r.p.p)}">${r.p.p}${r.p.pr}</span>${teamLogoHtml(r.p.t)}${r.p.t} · ${bye} · ADP ${r.p.adp} · Tier ${tiers[r.p.id]}</div>
         <div class="reasons">${r.reasons.slice(0,3).map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('')}</div>
       </div>`;
@@ -305,7 +311,7 @@ function renderQueue(){
       <div class="rnk">${i+1}</div>
       ${avatarHtml(p,'sm')}
       <div class="pinfo">
-        <div class="pname">${p.n}${isNext?' <span style="color:#f2cc60;font-size:11px;font-weight:800">NEXT UP</span>':''}</div>
+        <div class="pname">${p.n}${isNext?' <span style="color:#f2cc60;font-size:11px;font-weight:800">NEXT UP</span>':''}${injuryBadgeHtml(id)}</div>
         <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${p.b?'Bye '+p.b:'FA'} · ADP ${p.adp} · Tier ${tiers[p.id]}${st?(st==='mine'?' · <b style="color:var(--me)">MINE</b>':' · <b style="color:var(--bad)">GONE</b>'):''}</div>
       </div>`;
     d.querySelector('.pinfo').onclick=()=>openPlayer(id);
@@ -332,26 +338,37 @@ $('clearGone').onclick=()=>{ S.queue=S.queue.filter(id=>!status[id]); renderAll(
 function openPlayer(id){
   const p=PLAYERS.find(x=>x.id===id);
   const st=status[id]; const s=STATS[String(id)];
+  const e=ENRICH[id];
   const sheet=$('pSheet');
   const bye=p.b?`Bye ${p.b}`:'Free agent';
   let statsHtml;
   if(s){
     const fppg=(s.fp/s.g).toFixed(1);
     statsHtml=`<h2 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:16px 2px 6px">2025 season (PPR)</h2>
-      <div class="pd-facts" style="margin:8px 0 0">
+      <div class="pd-facts" style="grid-template-columns:repeat(3,1fr); margin:8px 0 0">
         <div class="fact"><div class="v">${s.fp.toFixed(1)}</div><div class="l">Fantasy pts</div></div>
         <div class="fact"><div class="v">${fppg}</div><div class="l">Pts / game</div></div>
         <div class="fact"><div class="v">${s.g}</div><div class="l">Games</div></div>
-        <div class="fact"><div class="v">${p.p==='DST'?'—':(s.g<12?'⚠':'✓')}</div><div class="l">${p.p==='DST'?'':(s.g<12?'Missed time':'Full-ish yr')}</div></div>
       </div>
       <div class="pd-stats">${s.rows.map(r=>`<div class="fact"><div class="v">${r[1]}</div><div class="l">${r[0]}</div></div>`).join('')}</div>`;
   } else {
     statsHtml=`<div class="pd-none">No 2025 NFL stats — rookie (2026 draft class) or missed last season.</div>`;
   }
+  let injuryHtml='';
+  if(e){
+    const injV = e.injury_status
+      ? `<span class="injbadge ${e.injury_status}" style="font-size:14px;padding:2px 9px">${e.injury_status}</span>`
+      : '✓ Active';
+    const depthV = (e.depth_chart_position && e.depth_chart_order) ? `${e.depth_chart_position} · #${e.depth_chart_order}` : '—';
+    injuryHtml=`<div class="pd-facts" style="grid-template-columns:1fr 1fr; margin-top:10px">
+        <div class="fact"><div class="v">${injV}</div><div class="l">Injury status</div></div>
+        <div class="fact"><div class="v">${depthV}</div><div class="l">Depth chart</div></div>
+      </div>`;
+  }
   sheet.innerHTML=`<div class="pd-head">
       ${avatarHtml(p,'lg')}
       <div style="flex:1">
-        <div class="pd-name">${p.n}</div>
+        <div class="pd-name">${p.n}${injuryBadgeHtml(id)}</div>
         <div class="pd-sub"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye}</div>
       </div>
       <button class="iconbtn" id="pdClose">✕</button>
@@ -362,6 +379,7 @@ function openPlayer(id){
       <div class="fact"><div class="v">${tiers[p.id]}</div><div class="l">Tier</div></div>
       <div class="fact"><div class="v">${p.b||'—'}</div><div class="l">Bye</div></div>
     </div>
+    ${injuryHtml}
     ${statsHtml}
     <div class="sheetbtns" id="pdBtns"></div>`;
   $('pdClose').onclick=()=>$('pModal').classList.remove('open');
@@ -443,9 +461,10 @@ function openCompare(){
     +rowH('ADP', info.map(x=>x.p.adp), -1)
     +rowH('Tier', info.map(x=>tiers[x.p.id]), -1)
     +rowH('Bye', info.map(x=>x.p.b||null), 0, info.map(x=>x.p.b&&myByes[x.p.b]?`⚠ ${myByes[x.p.b]} of yours`:''))
+    +rowH('Injury', info.map(x=>{ const e=ENRICH[x.p.id]; return e?(e.injury_status||'Active'):null; }), 0)
     +rowH('2025 pts', info.map(x=>x.s?x.s.fp:null), 1)
     +rowH('Pts/game', info.map(x=>x.ppg), 1)
-    +rowH('Games', info.map(x=>x.s?x.s.g:null), 0, info.map(x=>x.s&&x.s.g<12?'missed time':''))
+    +rowH('Games', info.map(x=>x.s?x.s.g:null), 0)
     +rowH('Draft fit', info.map(x=>x.score!=null?Math.round(x.score):null), 1, info.map(x=>x.st?'drafted':''))
   );
   // 2025 stat lines
