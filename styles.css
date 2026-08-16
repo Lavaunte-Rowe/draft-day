@@ -64,6 +64,24 @@
   .pos-RB{background:var(--rb)} .pos-WR{background:var(--wr)} .pos-QB{background:var(--qb)}
   .pos-TE{background:var(--te)} .pos-K{background:var(--k)} .pos-DST{background:var(--dst)}
   .tierb{font-size:10.5px; color:var(--dim);}
+  /* headshots + team logos (Phase 1: functional only, redesigned visually in Phase 2) */
+  .avatar-wrap{position:relative; width:36px; height:36px; border-radius:50%; overflow:hidden;
+    flex:none; border:2px solid var(--ring, var(--line)); background:var(--panel2);}
+  .avatar-wrap.sm{width:26px; height:26px; border-width:1.5px;}
+  .avatar-wrap.lg{width:56px; height:56px; border-width:2.5px;}
+  .avatar-fallback{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-weight:800; color:#fff; font-size:12px;}
+  .avatar-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center;}
+  .logo-wrap{position:relative; width:16px; height:16px; border-radius:4px; overflow:hidden; flex:none;
+    display:inline-flex; align-items:center; justify-content:center; vertical-align:-3px; margin-right:3px;}
+  .logo-fallback{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:6px; font-weight:800; color:#fff;}
+  .logo-img{position:absolute; inset:0; width:100%; height:100%; object-fit:contain;}
+  .injbadge{display:inline-block; font-size:10px; font-weight:800; padding:0 5px; border-radius:4px; margin-left:4px;
+    color:#0d1117; background:var(--warn);}
+  .injbadge.O, .injbadge.IR{background:var(--bad); color:#fff;}
+  .injbadge.D{background:var(--warn);}
+  .injbadge.Q{background:#d2992299; color:var(--text);}
   .btn{padding:9px 12px; font-size:12.5px; font-weight:700;}
   .btn.taken{background:var(--panel2); color:var(--bad); border:1px solid #f8514955;}
   .btn.mine{background:#a371f722; color:var(--me); border:1px solid #a371f766;}

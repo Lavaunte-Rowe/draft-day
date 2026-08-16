@@ -31,6 +31,28 @@ async function loadEnrichment(){
   }
 }
 loadEnrichment();
+/* ---------- avatars & team logos ---------- */
+function initials(name){
+  const parts=(name||'').replace(/[^a-zA-Z' -]/g,'').split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  const first=parts[0][0]||''; const last=parts.length>1?parts[parts.length-1][0]:'';
+  return (first+last).toUpperCase();
+}
+function avatarHtml(p, size){
+  const cls='avatar-wrap'+(size?' '+size:'');
+  const color=TEAM_COLORS[p.t]||TEAM_COLORS.FA;
+  const fb=`<div class="avatar-fallback" style="background:${color}">${initials(p.n)}</div>`;
+  const e=ENRICH[p.id];
+  const img=(e&&e.sleeper_id)
+    ? `<img class="avatar-img" src="https://sleepercdn.com/content/nfl/players/${e.sleeper_id}.jpg" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  return `<div class="${cls}" style="--ring:${color}">${fb}${img}</div>`;
+}
+function teamLogoHtml(team){
+  if(!team||team==='FA') return '';
+  const color=TEAM_COLORS[team]||TEAM_COLORS.FA;
+  return `<span class="logo-wrap" style="background:${color}"><span class="logo-fallback">${team}</span><img class="logo-img" src="https://a.espncdn.com/i/teamlogos/nfl/500/${team}.png" loading="lazy" onerror="this.style.display='none'"></span>`;
+}
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
 const posColor = p => `pos-${p}`;
@@ -201,9 +223,10 @@ function playerRow(p, compact){
     +(S.ui.cmp.includes(p.id)?' cmpsel':'');
   const bye = p.b ? `Bye ${p.b}` : 'FA';
   row.innerHTML=`<div class="rnk">${p.id}</div>
+    ${avatarHtml(p,'sm')}
     <div class="pinfo">
       <div class="pname">${p.n}${inQueue(p.id)?' <span style="color:#f2cc60">★</span>':''}</div>
-      <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${p.t} · ${bye} · ADP ${p.adp} · <span class="tierb">Tier ${tiers[p.id]}</span></div>
+      <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · ADP ${p.adp} · <span class="tierb">Tier ${tiers[p.id]}</span></div>
     </div>`;
   row.querySelector('.pinfo').onclick=()=>{
     if(S.ui.cmpActive) toggleCompare(p.id); else openPlayer(p.id); };
@@ -231,9 +254,10 @@ function renderRecs(){
     const d=document.createElement('div'); d.className='rec'+(i===0?' top':'');
     const bye=r.p.b?`Bye ${r.p.b}`:'FA';
     d.innerHTML=`<div class="recrank">${i+1}</div>
+      ${avatarHtml(r.p)}
       <div class="recmain">
         <div class="recname">${r.p.n}${inQueue(r.p.id)?' <span style="color:#f2cc60">★</span>':''}</div>
-        <div class="recmeta"><span class="posbadge ${posColor(r.p.p)}">${r.p.p}${r.p.pr}</span>${r.p.t} · ${bye} · ADP ${r.p.adp} · Tier ${tiers[r.p.id]}</div>
+        <div class="recmeta"><span class="posbadge ${posColor(r.p.p)}">${r.p.p}${r.p.pr}</span>${teamLogoHtml(r.p.t)}${r.p.t} · ${bye} · ADP ${r.p.adp} · Tier ${tiers[r.p.id]}</div>
         <div class="reasons">${r.reasons.slice(0,3).map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('')}</div>
       </div>`;
     d.querySelector('.recmain').onclick=()=>openPlayer(r.p.id);
@@ -279,9 +303,10 @@ function renderQueue(){
         <button data-d="-1" ${i===0?'disabled':''}>▲</button>
         <button data-d="1" ${i===S.queue.length-1?'disabled':''}>▼</button></div>
       <div class="rnk">${i+1}</div>
+      ${avatarHtml(p,'sm')}
       <div class="pinfo">
         <div class="pname">${p.n}${isNext?' <span style="color:#f2cc60;font-size:11px;font-weight:800">NEXT UP</span>':''}</div>
-        <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${p.t} · ${p.b?'Bye '+p.b:'FA'} · ADP ${p.adp} · Tier ${tiers[p.id]}${st?(st==='mine'?' · <b style="color:var(--me)">MINE</b>':' · <b style="color:var(--bad)">GONE</b>'):''}</div>
+        <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${p.b?'Bye '+p.b:'FA'} · ADP ${p.adp} · Tier ${tiers[p.id]}${st?(st==='mine'?' · <b style="color:var(--me)">MINE</b>':' · <b style="color:var(--bad)">GONE</b>'):''}</div>
       </div>`;
     d.querySelector('.pinfo').onclick=()=>openPlayer(id);
     d.querySelector('.qord').onclick=e=>{
@@ -324,9 +349,10 @@ function openPlayer(id){
     statsHtml=`<div class="pd-none">No 2025 NFL stats — rookie (2026 draft class) or missed last season.</div>`;
   }
   sheet.innerHTML=`<div class="pd-head">
+      ${avatarHtml(p,'lg')}
       <div style="flex:1">
         <div class="pd-name">${p.n}</div>
-        <div class="pd-sub"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${p.t} · ${bye}</div>
+        <div class="pd-sub"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye}</div>
       </div>
       <button class="iconbtn" id="pdClose">✕</button>
     </div>
@@ -412,7 +438,7 @@ function openCompare(){
   let html='';
   html+=grid(
     `<div class="cmp-cell lab"></div>`+info.map(x=>
-      `<div class="cmp-cell head">${x.p.n}<span class="sub"><span class="posbadge ${posColor(x.p.p)}">${x.p.p}${x.p.pr}</span>${x.p.t}${x.st?(x.st==='mine'?' · MINE':' · GONE'):''}</span></div>`).join('')
+      `<div class="cmp-cell head" style="display:flex; flex-direction:column; align-items:center; gap:4px">${avatarHtml(x.p,'sm')}<div>${x.p.n}</div><span class="sub"><span class="posbadge ${posColor(x.p.p)}">${x.p.p}${x.p.pr}</span>${x.p.t}${x.st?(x.st==='mine'?' · MINE':' · GONE'):''}</span></div>`).join('')
     +rowH('Consensus', info.map(x=>x.p.id), -1)
     +rowH('ADP', info.map(x=>x.p.adp), -1)
     +rowH('Tier', info.map(x=>tiers[x.p.id]), -1)
