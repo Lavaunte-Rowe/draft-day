@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Draft Day — Live Draft Assistant</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3240;
+    --text:#e6edf3; --dim:#8b98a9; --accent:#3fb950; --accent2:#58a6ff;
+    --warn:#d29922; --bad:#f85149; --me:#a371f7;
+    --rb:#3fb950; --wr:#58a6ff; --qb:#f85149; --te:#d29922; --k:#8b98a9; --dst:#a371f7;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:15px;}
+  button{font-family:inherit; cursor:pointer; border:none; border-radius:8px;}
+  input,select{font-family:inherit; background:var(--panel2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:15px;}
+  input:focus,select:focus{outline:1px solid var(--accent2);}
+  .wrap{max-width:760px; margin:0 auto; padding:0 10px 90px;}
+  /* header */
+  header{position:sticky; top:0; z-index:50; background:linear-gradient(180deg,#0d1117 80%,rgba(13,17,23,0)); padding:10px 0 4px;}
+  .hbar{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px 14px;
+    display:flex; align-items:center; gap:10px;}
+  .hbar h1{font-size:16px; margin:0; font-weight:700; letter-spacing:.2px;}
+  .hbar .sub{font-size:12px; color:var(--dim);}
+  .spacer{flex:1}
+  .iconbtn{background:var(--panel2); color:var(--text); padding:8px 12px; font-size:13px; border:1px solid var(--line);}
+  .statusbar{display:flex; gap:8px; margin-top:8px;}
+  .stat{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 10px; text-align:center;}
+  .stat .v{font-size:17px; font-weight:700;}
+  .stat .l{font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; margin-top:1px;}
+  .stat.onclock{border-color:var(--me); background:#a371f71a;}
+  .stat.onclock .v{color:var(--me);}
+  .stat .v.tap{cursor:pointer; text-decoration:underline dotted var(--dim);}
+  /* tabs */
+  .tabs{display:flex; gap:6px; margin:10px 0;}
+  .tab{flex:1; padding:9px 0; background:var(--panel); color:var(--dim); border:1px solid var(--line); font-size:13.5px; font-weight:600;}
+  .tab.active{background:var(--panel2); color:var(--text); border-color:var(--accent2);}
+  /* recommendations */
+  .recsec h2, section h2{font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:var(--dim); margin:14px 2px 8px;}
+  .rec{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px;
+    display:flex; align-items:center; gap:10px;}
+  .rec.top{border-color:var(--accent); background:#3fb95012;}
+  .recrank{font-size:18px; font-weight:800; color:var(--dim); width:22px; text-align:center;}
+  .rec.top .recrank{color:var(--accent);}
+  .recmain{flex:1; min-width:0;}
+  .recname{font-weight:700; font-size:15px;}
+  .recmeta{font-size:12px; color:var(--dim); margin-top:1px;}
+  .reasons{display:flex; flex-wrap:wrap; gap:4px; margin-top:5px;}
+  .chip{font-size:10.5px; padding:2px 7px; border-radius:20px; background:var(--panel2); border:1px solid var(--line); color:var(--dim);}
+  .chip.good{color:var(--accent); border-color:#3fb95055;}
+  .chip.urgent{color:var(--warn); border-color:#d2992255;}
+  .chip.gone{color:var(--bad); border-color:#f8514955;}
+  /* player rows */
+  .controls{display:flex; gap:6px; margin:8px 0; flex-wrap:wrap;}
+  .controls input[type=search]{flex:1; min-width:140px;}
+  .pfilters{display:flex; gap:5px; overflow-x:auto; padding-bottom:2px;}
+  .pf{padding:7px 12px; background:var(--panel); border:1px solid var(--line); color:var(--dim); font-size:12.5px; font-weight:700; white-space:nowrap;}
+  .pf.active{color:var(--text); border-color:var(--accent2); background:var(--panel2);}
+  .row{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 10px; margin-bottom:6px;
+    display:flex; align-items:center; gap:8px;}
+  .row.gone{opacity:.45;}
+  .row.mine{border-color:var(--me);}
+  .rnk{width:30px; text-align:center; font-size:12.5px; color:var(--dim); font-weight:700;}
+  .pinfo{flex:1; min-width:0;}
+  .pname{font-weight:650; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pmeta{font-size:11.5px; color:var(--dim); margin-top:1px;}
+  .posbadge{display:inline-block; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-right:5px; color:#0d1117;}
+  .pos-RB{background:var(--rb)} .pos-WR{background:var(--wr)} .pos-QB{background:var(--qb)}
+  .pos-TE{background:var(--te)} .pos-K{background:var(--k)} .pos-DST{background:var(--dst)}
+  .tierb{font-size:10.5px; color:var(--dim);}
+  .btn{padding:9px 12px; font-size:12.5px; font-weight:700;}
+  .btn.taken{background:var(--panel2); color:var(--bad); border:1px solid #f8514955;}
+  .btn.mine{background:#a371f722; color:var(--me); border:1px solid #a371f766;}
+  .btn.primary{background:var(--accent); color:#04140a;}
+  .btn.blue{background:var(--accent2); color:#04101f;}
+  .btn.ghost{background:var(--panel2); color:var(--text); border:1px solid var(--line);}
+  .btn:active{transform:scale(.96);}
+  .showmore{width:100%; padding:11px; background:var(--panel); border:1px dashed var(--line); color:var(--dim); font-size:13px;}
+  /* queue + stars */
+  .starbtn{width:34px; height:34px; border-radius:8px; background:var(--panel2); border:1px solid var(--line);
+    color:var(--dim); font-size:16px; padding:0; flex:none;}
+  .starbtn.on{color:#f2cc60; border-color:#f2cc6066; background:#f2cc6014;}
+  .qcount{display:inline-block; background:#f2cc60; color:#0d1117; border-radius:10px; font-size:10px;
+    font-weight:800; padding:1px 6px; margin-left:3px; vertical-align:1px;}
+  .qrow{display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:8px 10px; margin-bottom:6px;}
+  .qrow.next{border-color:#f2cc60; background:#f2cc600d;}
+  .qrow.gonerow{opacity:.45;}
+  .qrow.gonerow .pname{text-decoration:line-through;}
+  .qord{display:flex; flex-direction:column; gap:3px;}
+  .qord button{width:28px; height:24px; background:var(--panel2); border:1px solid var(--line); color:var(--dim);
+    border-radius:6px; font-size:11px; padding:0;}
+  .qx{width:30px; height:30px; background:none; border:none; color:var(--dim); font-size:16px; flex:none;}
+  /* player detail sheet */
+  .pd-head{display:flex; align-items:flex-start; gap:10px;}
+  .pd-name{font-size:19px; font-weight:800;}
+  .pd-sub{color:var(--dim); font-size:13px; margin-top:3px;}
+  .pd-facts{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0;}
+  .fact{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 4px; text-align:center;}
+  .fact .v{font-weight:800; font-size:15px;}
+  .fact .l{font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px; margin-top:2px;}
+  .pd-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;}
+  .pd-none{background:var(--panel2); border:1px dashed var(--line); border-radius:10px; padding:14px;
+    color:var(--dim); font-size:13px; text-align:center; margin-top:8px;}
+  .pinfo, .recmain{cursor:pointer;}
+  /* compare */
+  .cmpmode-btn.active{color:var(--text); border-color:#f2cc60; background:#f2cc6014;}
+  .row.cmpsel{border-color:#f2cc60; background:#f2cc600d;}
+  .cmpbar{position:fixed; bottom:74px; left:0; right:0; z-index:59; padding:0 10px; display:none;}
+  .cmpbar.show{display:block;}
+  .cmpbar-in{max-width:760px; margin:0 auto; background:var(--panel2); border:1px solid #f2cc6066;
+    border-radius:14px; padding:8px 10px; display:flex; align-items:center; gap:8px;
+    box-shadow:0 6px 24px #0009;}
+  .cmpbar-names{flex:1; font-size:12.5px; color:var(--text); overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+  .cmp-grid{display:grid; gap:6px; margin-top:10px;}
+  .cmp-cell{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:7px 6px;
+    text-align:center; font-size:13px; min-width:0; overflow-wrap:break-word;}
+  .cmp-cell.lab{background:none; border:none; text-align:left; color:var(--dim); font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; padding-left:0;}
+  .cmp-cell.head{font-weight:800; font-size:13.5px; border-color:var(--accent2);}
+  .cmp-cell.best{border-color:#3fb95088; background:#3fb95012;}
+  .cmp-cell .sub{display:block; font-size:10px; color:var(--dim); font-weight:400; margin-top:2px;}
+  .verdict{background:#3fb95012; border:1px solid #3fb95055; border-radius:12px; padding:10px 12px;
+    font-size:13.5px; line-height:1.5; margin-top:12px;}
+  .verdict b{color:var(--accent);}
+  .verdict.tie{background:#d2992212; border-color:#d2992255;}
+  .verdict.tie b{color:var(--warn);}
+  /* bottom bar */
+  .bottombar{position:fixed; bottom:0; left:0; right:0; z-index:60;
+    background:linear-gradient(0deg,#0d1117 75%,rgba(13,17,23,0)); padding:10px;}
+  .bb{max-width:760px; margin:0 auto; display:flex; gap:8px;}
+  .bb .btn{flex:1; padding:13px 8px; font-size:13.5px; border-radius:12px;}
+  /* my team */
+  .slotrow{display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:8px 12px; margin-bottom:5px;}
+  .slotlab{width:44px; font-size:11.5px; font-weight:800; color:var(--dim);}
+  .slotrow .empty{color:#3d4654; font-size:13.5px;}
+  .byewarn{font-size:12px; color:var(--warn); margin:8px 2px;}
+  /* log */
+  .logrow{display:flex; gap:10px; align-items:center; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:7px 12px; margin-bottom:5px; font-size:13.5px;}
+  .logpick{width:52px; color:var(--dim); font-size:12px; font-weight:700;}
+  /* modal */
+  .modal{position:fixed; inset:0; background:#000a; z-index:100; display:none; align-items:flex-end; justify-content:center;}
+  .modal.open{display:flex;}
+  .sheet{background:var(--panel); border:1px solid var(--line); border-radius:18px 18px 0 0; width:100%; max-width:760px;
+    max-height:88vh; overflow-y:auto; padding:18px 16px 26px;}
+  .sheet h3{margin:0 0 12px; font-size:16px;}
+  .sheet label{display:block; font-size:12px; color:var(--dim); margin:12px 0 4px; text-transform:uppercase; letter-spacing:.5px;}
+  .setgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .reqgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+  .reqitem{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center;}
+  .reqitem .lab{font-size:10.5px; color:var(--dim); font-weight:800;}
+  .stepper{display:flex; align-items:center; justify-content:center; gap:8px; margin-top:4px;}
+  .stepper button{width:26px; height:26px; border-radius:6px; background:var(--panel); color:var(--text); border:1px solid var(--line); font-size:15px;}
+  .stepper .num{font-weight:800; width:18px;}
+  textarea.export{width:100%; height:200px; background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:10px; font-size:12px; font-family:ui-monospace,Menlo,monospace; margin-top:8px;}
+  .sheetbtns{display:flex; gap:8px; margin-top:14px;}
+  .sheetbtns .btn{flex:1; padding:12px;}
+  .note{font-size:12px; color:var(--dim); line-height:1.5; margin-top:10px;}
+  .toast{position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--accent); color:#04140a;
+    font-weight:700; font-size:13.5px; padding:10px 18px; border-radius:24px; z-index:200; display:none;}
+  /* setup screen */
+  .setup{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px 16px; margin-top:16px;}
+  .setup h2{font-size:18px; margin:0 0 4px; text-transform:none; letter-spacing:0; color:var(--text);}
+  .setup p{color:var(--dim); font-size:13.5px; margin:4px 0 12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hbar">
+      <div>
+        <h1>🏈 Draft Day</h1>
+        <div class="sub" id="subhdr">2026 · PPR · consensus ADP</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="undoBtn">↩ Undo</button>
+      <button class="iconbtn" id="setBtn">⚙</button>
+    </div>
+    <div class="statusbar" id="statusbar" style="display:none">
+      <div class="stat"><div class="v" id="stRound">–</div><div class="l">Round</div></div>
+      <div class="stat"><div class="v tap" id="stPick" title="Tap to correct pick #">–</div><div class="l">Overall pick</div></div>
+      <div class="stat" id="stClockBox"><div class="v" id="stClock">–</div><div class="l" id="stClockLab">On the clock</div></div>
+      <div class="stat"><div class="v" id="stNext">–</div><div class="l">Your next</div></div>
+    </div>
+    <div class="tabs" id="tabs" style="display:none">
+      <button class="tab active" data-tab="draft">Draft</button>
+      <button class="tab" data-tab="queue">Queue <span id="qCount" class="qcount" style="display:none">0</span></button>
+      <button class="tab" data-tab="team">My team</button>
+      <button class="tab" data-tab="log">Log</button>
+    </div>
+  </header>
+  <!-- SETUP -->
+  <div id="setupView" class="setup">
+    <h2>League setup</h2>
+    <p>Set this once before the draft starts. You can change it later from ⚙.</p>
+    <div class="setgrid">
+      <div><label>Teams</label><select id="suTeams"></select></div>
+      <div><label>Your draft slot</label><select id="suSlot"></select></div>
+      <div><label>Rounds</label><select id="suRounds"></select></div>
+      <div><label>Scoring</label><select id="suScore"><option>PPR</option></select></div>
+    </div>
+    <label>Starting lineup + bench</label>
+    <div class="reqgrid" id="suReq"></div>
+    <div class="sheetbtns"><button class="btn primary" id="suStart" style="font-size:15px">Start draft</button></div>
+    <div class="note">Player pool: consensus 2026 PPR rankings &amp; ADP (300 players), compiled July 2026. Tap <b>Taken</b> when anyone else drafts a player, <b>Me</b> when you draft. The board and advice update every pick.</div>
+  </div>
+  <!-- DRAFT TAB -->
+  <div id="draftView" style="display:none">
+    <section class="recsec">
+      <h2 id="recHdr">Recommended now</h2>
+      <div id="recs"></div>
+    </section>
+    <section>
+      <h2>Available players</h2>
+      <div class="controls">
+        <input type="search" id="search" placeholder="Search player or team…">
+        <button class="btn ghost" id="toggleDrafted">Hide drafted</button>
+        <button class="btn ghost cmpmode-btn" id="cmpMode">⚖ Compare</button>
+      </div>
+      <div class="pfilters" id="pfilters"></div>
+      <div id="board" style="margin-top:8px"></div>
+      <button class="showmore" id="showMore">Show more</button>
+    </section>
+  </div>
+  <!-- QUEUE TAB -->
+  <div id="queueView" style="display:none">
+    <section>
+      <h2>My queue — next targets</h2>
+      <div class="note" style="margin:0 2px 10px">Tap ☆ on any player to star them. Your queue keeps priority order — drag with ▲▼. Players drafted by others get crossed off automatically.</div>
+      <div id="queueList"></div>
+      <button class="btn ghost" id="clearGone" style="width:100%; margin-top:6px; display:none">Clear drafted players from queue</button>
+    </section>
+  </div>
+  <!-- TEAM TAB -->
+  <div id="teamView" style="display:none">
+    <section><h2>My roster</h2><div id="roster"></div><div class="byewarn" id="byeWarn"></div></section>
+    <section><h2>Positional needs</h2><div id="needs" class="note" style="margin-top:0"></div></section>
+  </div>
+  <!-- LOG TAB -->
+  <div id="logView" style="display:none">
+    <section><h2>Draft log</h2><div id="log"></div></section>
+  </div>
+</div>
+<div class="bottombar" id="bottombar" style="display:none">
+  <div class="bb">
+    <button class="btn blue" id="askClaude">📋 Copy state for Claude</button>
+    <button class="btn ghost" id="saveBtn">💾 Save / load</button>
+  </div>
+</div>
+<!-- SETTINGS MODAL -->
+<div class="modal" id="setModal"><div class="sheet">
+  <h3>Settings</h3>
+  <div class="setgrid">
+    <div><label>Teams</label><select id="mTeams"></select></div>
+    <div><label>Your draft slot</label><select id="mSlot"></select></div>
+    <div><label>Rounds</label><select id="mRounds"></select></div>
+    <div><label>Current overall pick</label><input type="number" id="mPick" min="1"></div>
+  </div>
+  <label>Starting lineup + bench</label>
+  <div class="reqgrid" id="mReq"></div>
+  <div class="sheetbtns">
+    <button class="btn ghost" id="mCancel">Cancel</button>
+    <button class="btn primary" id="mSave">Save</button>
+  </div>
+  <div class="sheetbtns"><button class="btn taken" id="mReset" style="flex:1">Reset entire draft</button></div>
+</div></div>
+<!-- EXPORT MODAL -->
+<div class="modal" id="exModal"><div class="sheet">
+  <h3 id="exTitle">Draft state</h3>
+  <div class="note" id="exNote"></div>
+  <textarea class="export" id="exText"></textarea>
+  <div class="sheetbtns">
+    <button class="btn ghost" id="exClose">Close</button>
+    <button class="btn ghost" id="exLoad" style="display:none">Load pasted state</button>
+    <button class="btn primary" id="exCopy">Copy to clipboard</button>
+  </div>
+</div></div>
+<!-- COMPARE FLOATING BAR -->
+<div class="cmpbar" id="cmpBar"><div class="cmpbar-in">
+  <div class="cmpbar-names" id="cmpNames"></div>
+  <button class="btn ghost" id="cmpClear" style="padding:8px 10px">Clear</button>
+  <button class="btn primary" id="cmpOpen" style="padding:8px 14px">Compare</button>
+</div></div>
+<!-- COMPARE MODAL -->
+<div class="modal" id="cModal"><div class="sheet">
+  <div class="pd-head">
+    <div style="flex:1"><h3 style="margin:0">⚖ Player comparison</h3></div>
+    <button class="iconbtn" id="cClose">✕</button>
+  </div>
+  <div id="cBody"></div>
+  <div class="sheetbtns">
+    <button class="btn blue" id="cAsk" style="flex:1">📋 Copy matchup for Claude</button>
+  </div>
+</div></div>
+<!-- PLAYER DETAIL MODAL -->
+<div class="modal" id="pModal"><div class="sheet" id="pSheet"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+const PLAYERS = [{"id":1,"n":"Jahmyr Gibbs","t":"DET","p":"RB","pr":1,"b":6,"adp":1},{"id":2,"n":"Bijan Robinson","t":"ATL","p":"RB","pr":2,"b":11,"adp":2},{"id":3,"n":"Ja'Marr Chase","t":"CIN","p":"WR","pr":1,"b":6,"adp":3},{"id":4,"n":"Puka Nacua","t":"LAR","p":"WR","pr":2,"b":11,"adp":4},{"id":5,"n":"Jaxon Smith-Njigba","t":"SEA","p":"WR","pr":3,"b":11,"adp":5},{"id":6,"n":"Christian McCaffrey","t":"SF","p":"RB","pr":3,"b":8,"adp":6},{"id":7,"n":"Amon-Ra St. Brown","t":"DET","p":"WR","pr":4,"b":6,"adp":7},{"id":8,"n":"Jonathan Taylor","t":"IND","p":"RB","pr":4,"b":13,"adp":8},{"id":9,"n":"CeeDee Lamb","t":"DAL","p":"WR","pr":5,"b":14,"adp":9},{"id":10,"n":"Ashton Jeanty","t":"LV","p":"RB","pr":5,"b":13,"adp":10},{"id":11,"n":"Justin Jefferson","t":"MIN","p":"WR","pr":6,"b":6,"adp":11},{"id":12,"n":"James Cook","t":"BUF","p":"RB","pr":6,"b":7,"adp":12},{"id":13,"n":"Saquon Barkley","t":"PHI","p":"RB","pr":7,"b":10,"adp":13},{"id":14,"n":"Omarion Hampton","t":"LAC","p":"RB","pr":8,"b":7,"adp":14},{"id":15,"n":"De'Von Achane","t":"MIA","p":"RB","pr":9,"b":6,"adp":15},{"id":16,"n":"Chase Brown","t":"CIN","p":"RB","pr":10,"b":6,"adp":16},{"id":17,"n":"Brock Bowers","t":"LV","p":"TE","pr":1,"b":13,"adp":17},{"id":18,"n":"Drake London","t":"ATL","p":"WR","pr":7,"b":11,"adp":18},{"id":19,"n":"Kenneth Walker","t":"KC","p":"RB","pr":11,"b":5,"adp":19},{"id":20,"n":"A.J. Brown","t":"NE","p":"WR","pr":8,"b":11,"adp":20},{"id":21,"n":"Derrick Henry","t":"BAL","p":"RB","pr":12,"b":13,"adp":21},{"id":22,"n":"Nico Collins","t":"HOU","p":"WR","pr":9,"b":8,"adp":22},{"id":23,"n":"Trey McBride","t":"ARI","p":"TE","pr":2,"b":14,"adp":23},{"id":24,"n":"Jeremiyah Love","t":"ARI","p":"RB","pr":13,"b":14,"adp":24},{"id":25,"n":"George Pickens","t":"DAL","p":"WR","pr":10,"b":14,"adp":25},{"id":26,"n":"Rashee Rice","t":"KC","p":"WR","pr":11,"b":5,"adp":26},{"id":27,"n":"DeVonta Smith","t":"PHI","p":"WR","pr":12,"b":10,"adp":27},{"id":28,"n":"Josh Allen","t":"BUF","p":"QB","pr":1,"b":7,"adp":28},{"id":29,"n":"Chris Olave","t":"NO","p":"WR","pr":13,"b":8,"adp":29},{"id":30,"n":"Breece Hall","t":"NYJ","p":"RB","pr":14,"b":13,"adp":30},{"id":31,"n":"Kyren Williams","t":"LAR","p":"RB","pr":15,"b":11,"adp":31},{"id":32,"n":"Zay Flowers","t":"BAL","p":"WR","pr":14,"b":13,"adp":32},{"id":33,"n":"Javonte Williams","t":"DAL","p":"RB","pr":16,"b":14,"adp":33},{"id":34,"n":"Emeka Egbuka","t":"TB","p":"WR","pr":15,"b":10,"adp":34},{"id":35,"n":"Josh Jacobs","t":"GB","p":"RB","pr":17,"b":11,"adp":35},{"id":36,"n":"Tee Higgins","t":"CIN","p":"WR","pr":16,"b":6,"adp":36},{"id":37,"n":"Garrett Wilson","t":"NYJ","p":"WR","pr":17,"b":13,"adp":37},{"id":38,"n":"Tetairoa McMillan","t":"CAR","p":"WR","pr":18,"b":5,"adp":38},{"id":39,"n":"Colston Loveland","t":"CHI","p":"TE","pr":3,"b":10,"adp":39},{"id":40,"n":"Travis Etienne","t":"NO","p":"RB","pr":18,"b":8,"adp":40},{"id":41,"n":"Malik Nabers","t":"NYG","p":"WR","pr":19,"b":8,"adp":41},{"id":42,"n":"Cam Skattebo","t":"NYG","p":"RB","pr":19,"b":8,"adp":42},{"id":43,"n":"Ladd McConkey","t":"LAC","p":"WR","pr":20,"b":7,"adp":43},{"id":44,"n":"Jaylen Waddle","t":"DEN","p":"WR","pr":21,"b":10,"adp":44},{"id":45,"n":"Terry McLaurin","t":"WAS","p":"WR","pr":22,"b":7,"adp":45},{"id":46,"n":"Luther Burden","t":"CHI","p":"WR","pr":23,"b":10,"adp":46},{"id":47,"n":"Davante Adams","t":"LAR","p":"WR","pr":24,"b":11,"adp":47},{"id":48,"n":"Lamar Jackson","t":"BAL","p":"QB","pr":2,"b":13,"adp":48},{"id":49,"n":"D'Andre Swift","t":"CHI","p":"RB","pr":20,"b":10,"adp":49},{"id":50,"n":"David Montgomery","t":"HOU","p":"RB","pr":21,"b":8,"adp":50},{"id":51,"n":"Quinshon Judkins","t":"CLE","p":"RB","pr":22,"b":11,"adp":51},{"id":52,"n":"Jameson Williams","t":"DET","p":"WR","pr":25,"b":6,"adp":52},{"id":53,"n":"Tyler Warren","t":"IND","p":"TE","pr":4,"b":13,"adp":53},{"id":54,"n":"TreVeyon Henderson","t":"NE","p":"RB","pr":23,"b":11,"adp":54},{"id":55,"n":"D.J. Moore","t":"BUF","p":"WR","pr":26,"b":7,"adp":55},{"id":56,"n":"Bucky Irving","t":"TB","p":"RB","pr":24,"b":10,"adp":56},{"id":57,"n":"Mike Evans","t":"SF","p":"WR","pr":27,"b":8,"adp":57},{"id":58,"n":"Bhayshul Tuten","t":"JAX","p":"RB","pr":25,"b":7,"adp":58},{"id":59,"n":"Drake Maye","t":"NE","p":"QB","pr":3,"b":11,"adp":59},{"id":60,"n":"Rome Odunze","t":"CHI","p":"WR","pr":28,"b":10,"adp":60},{"id":61,"n":"Christian Watson","t":"GB","p":"WR","pr":29,"b":11,"adp":61},{"id":62,"n":"Joe Burrow","t":"CIN","p":"QB","pr":4,"b":6,"adp":62},{"id":63,"n":"Carnell Tate","t":"TEN","p":"WR","pr":30,"b":9,"adp":63},{"id":64,"n":"Jayden Daniels","t":"WAS","p":"QB","pr":5,"b":7,"adp":64},{"id":65,"n":"Jadarian Price","t":"SEA","p":"RB","pr":26,"b":11,"adp":65},{"id":66,"n":"Marvin Harrison Jr.","t":"ARI","p":"WR","pr":31,"b":14,"adp":66},{"id":67,"n":"Brian Thomas Jr.","t":"JAX","p":"WR","pr":32,"b":7,"adp":67},{"id":68,"n":"Jalen Hurts","t":"PHI","p":"QB","pr":6,"b":10,"adp":68},{"id":69,"n":"Jaylen Warren","t":"PIT","p":"RB","pr":27,"b":9,"adp":69},{"id":70,"n":"Parker Washington","t":"JAX","p":"WR","pr":33,"b":7,"adp":70},{"id":71,"n":"Caleb Williams","t":"CHI","p":"QB","pr":7,"b":10,"adp":71},{"id":72,"n":"Tony Pollard","t":"TEN","p":"RB","pr":28,"b":9,"adp":72},{"id":73,"n":"Jordyn Tyson","t":"NO","p":"WR","pr":34,"b":8,"adp":73},{"id":74,"n":"DK Metcalf","t":"PIT","p":"WR","pr":35,"b":9,"adp":74},{"id":75,"n":"Tucker Kraft","t":"GB","p":"TE","pr":5,"b":11,"adp":75},{"id":76,"n":"Alec Pierce","t":"IND","p":"WR","pr":36,"b":13,"adp":76},{"id":77,"n":"Chuba Hubbard","t":"CAR","p":"RB","pr":29,"b":5,"adp":77},{"id":78,"n":"Rhamondre Stevenson","t":"NE","p":"RB","pr":30,"b":11,"adp":78},{"id":79,"n":"Kyle Pitts","t":"ATL","p":"TE","pr":6,"b":11,"adp":79},{"id":80,"n":"Courtland Sutton","t":"DEN","p":"WR","pr":37,"b":10,"adp":80},{"id":81,"n":"Sam LaPorta","t":"DET","p":"TE","pr":7,"b":6,"adp":81},{"id":82,"n":"Harold Fannin","t":"CLE","p":"TE","pr":8,"b":11,"adp":82},{"id":83,"n":"Justin Herbert","t":"LAC","p":"QB","pr":8,"b":7,"adp":83},{"id":84,"n":"Dak Prescott","t":"DAL","p":"QB","pr":9,"b":14,"adp":84},{"id":85,"n":"Trevor Lawrence","t":"JAX","p":"QB","pr":10,"b":7,"adp":85},{"id":86,"n":"RJ Harvey","t":"DEN","p":"RB","pr":31,"b":10,"adp":86},{"id":87,"n":"Rico Dowdle","t":"PIT","p":"RB","pr":32,"b":9,"adp":87},{"id":88,"n":"Quentin Johnston","t":"LAC","p":"WR","pr":38,"b":7,"adp":88},{"id":89,"n":"Makai Lemon","t":"PHI","p":"WR","pr":39,"b":10,"adp":89},{"id":90,"n":"Michael Pittman Jr.","t":"PIT","p":"WR","pr":40,"b":9,"adp":90},{"id":91,"n":"Chris Godwin","t":"TB","p":"WR","pr":41,"b":10,"adp":91},{"id":92,"n":"Jaxson Dart","t":"NYG","p":"QB","pr":11,"b":8,"adp":92},{"id":93,"n":"Jonathon Brooks","t":"CAR","p":"RB","pr":33,"b":5,"adp":93},{"id":94,"n":"Brock Purdy","t":"SF","p":"QB","pr":12,"b":8,"adp":94},{"id":95,"n":"Matthew Stafford","t":"LAR","p":"QB","pr":13,"b":11,"adp":95},{"id":96,"n":"Kyle Monangai","t":"CHI","p":"RB","pr":34,"b":10,"adp":96},{"id":97,"n":"George Kittle","t":"SF","p":"TE","pr":9,"b":8,"adp":97},{"id":98,"n":"Kenneth Gainwell","t":"TB","p":"RB","pr":35,"b":10,"adp":98},{"id":99,"n":"Rachaad White","t":"WAS","p":"RB","pr":36,"b":7,"adp":99},{"id":100,"n":"J.K. Dobbins","t":"DEN","p":"RB","pr":37,"b":10,"adp":100},{"id":101,"n":"Ricky Pearsall","t":"SF","p":"WR","pr":42,"b":8,"adp":101},{"id":102,"n":"Patrick Mahomes","t":"KC","p":"QB","pr":14,"b":5,"adp":102},{"id":103,"n":"Blake Corum","t":"LAR","p":"RB","pr":38,"b":11,"adp":103},{"id":104,"n":"Michael Wilson","t":"ARI","p":"WR","pr":43,"b":14,"adp":104},{"id":105,"n":"Josh Downs","t":"IND","p":"WR","pr":44,"b":13,"adp":105},{"id":106,"n":"Jayden Reed","t":"GB","p":"WR","pr":45,"b":11,"adp":106},{"id":107,"n":"Jordan Addison","t":"MIN","p":"WR","pr":46,"b":6,"adp":107},{"id":108,"n":"Bo Nix","t":"DEN","p":"QB","pr":15,"b":10,"adp":108},{"id":109,"n":"Travis Kelce","t":"KC","p":"TE","pr":10,"b":5,"adp":109},{"id":110,"n":"Jakobi Meyers","t":"JAX","p":"WR","pr":47,"b":7,"adp":110},{"id":111,"n":"Wan'Dale Robinson","t":"TEN","p":"WR","pr":48,"b":9,"adp":111},{"id":112,"n":"Jared Goff","t":"DET","p":"QB","pr":16,"b":6,"adp":112},{"id":113,"n":"Xavier Worthy","t":"KC","p":"WR","pr":49,"b":5,"adp":113},{"id":114,"n":"Matthew Golden","t":"GB","p":"WR","pr":50,"b":11,"adp":114},{"id":115,"n":"Jordan Mason","t":"MIN","p":"RB","pr":39,"b":6,"adp":115},{"id":116,"n":"Dallas Goedert","t":"PHI","p":"TE","pr":11,"b":10,"adp":116},{"id":117,"n":"Isaiah Likely","t":"NYG","p":"TE","pr":12,"b":8,"adp":117},{"id":118,"n":"Jake Ferguson","t":"DAL","p":"TE","pr":13,"b":14,"adp":118},{"id":119,"n":"Dalton Kincaid","t":"BUF","p":"TE","pr":14,"b":7,"adp":119},{"id":120,"n":"Kyler Murray","t":"MIN","p":"QB","pr":17,"b":6,"adp":120},{"id":121,"n":"Aaron Jones","t":"MIN","p":"RB","pr":40,"b":6,"adp":121},{"id":122,"n":"Jacory Croskey-Merritt","t":"WAS","p":"RB","pr":41,"b":7,"adp":122},{"id":123,"n":"Mark Andrews","t":"BAL","p":"TE","pr":15,"b":13,"adp":123},{"id":124,"n":"Romeo Doubs","t":"NE","p":"WR","pr":51,"b":11,"adp":124},{"id":125,"n":"Baker Mayfield","t":"TB","p":"QB","pr":18,"b":10,"adp":125},{"id":126,"n":"KC Concepcion","t":"CLE","p":"WR","pr":52,"b":11,"adp":126},{"id":127,"n":"Jordan Love","t":"GB","p":"QB","pr":19,"b":11,"adp":127},{"id":128,"n":"Tyler Shough","t":"NO","p":"QB","pr":20,"b":8,"adp":128},{"id":129,"n":"Jayden Higgins","t":"HOU","p":"WR","pr":53,"b":8,"adp":129},{"id":130,"n":"Khalil Shakir","t":"BUF","p":"WR","pr":54,"b":7,"adp":130},{"id":131,"n":"Jalen Coker","t":"CAR","p":"WR","pr":55,"b":5,"adp":131},{"id":132,"n":"Chris Rodriguez","t":"JAX","p":"RB","pr":42,"b":7,"adp":132},{"id":133,"n":"Tyrone Tracy","t":"NYG","p":"RB","pr":43,"b":8,"adp":133},{"id":134,"n":"Rashid Shaheed","t":"SEA","p":"WR","pr":56,"b":11,"adp":134},{"id":135,"n":"Stefon Diggs","t":"FA","p":"WR","pr":57,"b":0,"adp":135},{"id":136,"n":"Malik Willis","t":"MIA","p":"QB","pr":21,"b":6,"adp":136},{"id":137,"n":"Woody Marks","t":"HOU","p":"RB","pr":44,"b":8,"adp":137},{"id":138,"n":"Chigoziem Okonkwo","t":"WAS","p":"TE","pr":16,"b":7,"adp":138},{"id":139,"n":"Brenton Strange","t":"JAX","p":"TE","pr":17,"b":7,"adp":139},{"id":140,"n":"Tyjae Spears","t":"TEN","p":"RB","pr":45,"b":9,"adp":140},{"id":141,"n":"Isiah Pacheco","t":"DET","p":"RB","pr":46,"b":6,"adp":141},{"id":142,"n":"Oronde Gadsden","t":"LAC","p":"TE","pr":18,"b":7,"adp":142},{"id":143,"n":"Zach Charbonnet","t":"SEA","p":"RB","pr":47,"b":11,"adp":143},{"id":144,"n":"Juwan Johnson","t":"NO","p":"TE","pr":19,"b":8,"adp":144},{"id":145,"n":"Jalen McMillan","t":"TB","p":"WR","pr":58,"b":10,"adp":145},{"id":146,"n":"Tyler Allgeier","t":"ARI","p":"RB","pr":48,"b":14,"adp":146},{"id":147,"n":"Alvin Kamara","t":"NO","p":"RB","pr":49,"b":8,"adp":147},{"id":148,"n":"Hunter Henry","t":"NE","p":"TE","pr":20,"b":11,"adp":148},{"id":149,"n":"Omar Cooper Jr.","t":"NYJ","p":"WR","pr":59,"b":13,"adp":149},{"id":150,"n":"Tre Tucker","t":"LV","p":"WR","pr":60,"b":13,"adp":150},{"id":151,"n":"Daniel Jones","t":"IND","p":"QB","pr":22,"b":13,"adp":151},{"id":152,"n":"C.J. Stroud","t":"HOU","p":"QB","pr":23,"b":8,"adp":152},{"id":153,"n":"T.J. Hockenson","t":"MIN","p":"TE","pr":21,"b":6,"adp":153},{"id":154,"n":"Denzel Boston","t":"CLE","p":"WR","pr":61,"b":11,"adp":154},{"id":155,"n":"Jalen Nailor","t":"LV","p":"WR","pr":62,"b":13,"adp":155},{"id":156,"n":"Kenyon Sadiq","t":"NYJ","p":"TE","pr":22,"b":13,"adp":156},{"id":157,"n":"Tank Bigsby","t":"PHI","p":"RB","pr":50,"b":10,"adp":157},{"id":158,"n":"Travis Hunter","t":"JAX","p":"WR","pr":63,"b":7,"adp":158},{"id":159,"n":"Cam Ward","t":"TEN","p":"QB","pr":24,"b":9,"adp":159},{"id":160,"n":"Jauan Jennings","t":"MIN","p":"WR","pr":64,"b":6,"adp":160},{"id":161,"n":"Sam Darnold","t":"SEA","p":"QB","pr":25,"b":11,"adp":161},{"id":162,"n":"Brian Robinson","t":"ATL","p":"RB","pr":51,"b":11,"adp":162},{"id":163,"n":"Bryce Young","t":"CAR","p":"QB","pr":26,"b":5,"adp":163},{"id":164,"n":"Dalton Schultz","t":"HOU","p":"TE","pr":23,"b":8,"adp":164},{"id":165,"n":"Jerry Jeudy","t":"CLE","p":"WR","pr":65,"b":11,"adp":165},{"id":166,"n":"AJ Barner","t":"SEA","p":"TE","pr":24,"b":11,"adp":166},{"id":167,"n":"Braelon Allen","t":"NYJ","p":"RB","pr":52,"b":13,"adp":167},{"id":168,"n":"Deebo Samuel","t":"FA","p":"WR","pr":66,"b":0,"adp":168},{"id":169,"n":"Antonio Williams","t":"WAS","p":"WR","pr":67,"b":7,"adp":169},{"id":170,"n":"Adonai Mitchell","t":"NYJ","p":"WR","pr":68,"b":13,"adp":170},{"id":171,"n":"Calvin Ridley","t":"TEN","p":"WR","pr":69,"b":9,"adp":171},{"id":172,"n":"Terrance Ferguson","t":"LAR","p":"TE","pr":25,"b":11,"adp":172},{"id":173,"n":"James Conner","t":"ARI","p":"RB","pr":53,"b":14,"adp":173},{"id":174,"n":"Keaton Mitchell","t":"LAC","p":"RB","pr":54,"b":7,"adp":174},{"id":175,"n":"Jonah Coleman","t":"DEN","p":"RB","pr":55,"b":10,"adp":175},{"id":176,"n":"Tyreek Hill","t":"FA","p":"WR","pr":70,"b":0,"adp":176},{"id":177,"n":"Dylan Sampson","t":"CLE","p":"RB","pr":56,"b":11,"adp":177},{"id":178,"n":"Ryan Flournoy","t":"DAL","p":"WR","pr":71,"b":14,"adp":178},{"id":179,"n":"Tre' Harris","t":"LAC","p":"WR","pr":72,"b":7,"adp":179},{"id":180,"n":"Isaac TeSlaa","t":"DET","p":"WR","pr":73,"b":6,"adp":180},{"id":181,"n":"Greg Dulcich","t":"MIA","p":"TE","pr":26,"b":6,"adp":181},{"id":182,"n":"Ray Davis","t":"BUF","p":"RB","pr":57,"b":7,"adp":182},{"id":183,"n":"Jaydon Blue","t":"DAL","p":"RB","pr":58,"b":14,"adp":183},{"id":184,"n":"Malik Washington","t":"MIA","p":"WR","pr":74,"b":6,"adp":184},{"id":185,"n":"Gunnar Helm","t":"TEN","p":"TE","pr":27,"b":9,"adp":185},{"id":186,"n":"Pat Freiermuth","t":"PIT","p":"TE","pr":28,"b":9,"adp":186},{"id":187,"n":"Fernando Mendoza","t":"LV","p":"QB","pr":27,"b":13,"adp":187},{"id":188,"n":"MarShawn Lloyd","t":"GB","p":"RB","pr":59,"b":11,"adp":188},{"id":189,"n":"Jacoby Brissett","t":"ARI","p":"QB","pr":28,"b":14,"adp":189},{"id":190,"n":"Kaytron Allen","t":"WAS","p":"RB","pr":60,"b":7,"adp":190},{"id":191,"n":"Aaron Rodgers","t":"PIT","p":"QB","pr":29,"b":9,"adp":191},{"id":192,"n":"Emmett Johnson","t":"KC","p":"RB","pr":61,"b":5,"adp":192},{"id":193,"n":"Sean Tucker","t":"TB","p":"RB","pr":62,"b":10,"adp":193},{"id":194,"n":"Kimani Vidal","t":"LAC","p":"RB","pr":63,"b":7,"adp":194},{"id":195,"n":"Zachariah Branch","t":"ATL","p":"WR","pr":75,"b":11,"adp":195},{"id":196,"n":"Jordan James","t":"SF","p":"RB","pr":64,"b":8,"adp":196},{"id":197,"n":"Mike Washington Jr.","t":"LV","p":"RB","pr":65,"b":13,"adp":197},{"id":198,"n":"Nicholas Singleton","t":"TEN","p":"RB","pr":66,"b":9,"adp":198},{"id":199,"n":"Germie Bernard","t":"PIT","p":"WR","pr":76,"b":9,"adp":199},{"id":200,"n":"Kayshon Boutte","t":"NE","p":"WR","pr":77,"b":11,"adp":200},{"id":201,"n":"Justice Hill","t":"BAL","p":"RB","pr":67,"b":13,"adp":201},{"id":202,"n":"Cooper Kupp","t":"SEA","p":"WR","pr":78,"b":11,"adp":202},{"id":203,"n":"George Holani","t":"SEA","p":"RB","pr":68,"b":11,"adp":203},{"id":204,"n":"Emanuel Wilson","t":"SEA","p":"RB","pr":69,"b":11,"adp":204},{"id":205,"n":"Demond Claiborne","t":"MIN","p":"RB","pr":70,"b":6,"adp":205},{"id":206,"n":"Jaylin Noel","t":"HOU","p":"WR","pr":79,"b":8,"adp":206},{"id":207,"n":"Brandon Aiyuk","t":"SF","p":"WR","pr":80,"b":8,"adp":207},{"id":208,"n":"Shedeur Sanders","t":"CLE","p":"QB","pr":30,"b":11,"adp":208},{"id":209,"n":"Rashod Bateman","t":"BAL","p":"WR","pr":81,"b":13,"adp":209},{"id":210,"n":"Kaelon Black","t":"SF","p":"RB","pr":71,"b":8,"adp":210},{"id":211,"n":"Pat Bryant","t":"DEN","p":"WR","pr":82,"b":10,"adp":211},{"id":212,"n":"Jaylen Wright","t":"MIA","p":"RB","pr":72,"b":6,"adp":212},{"id":213,"n":"Malachi Fields","t":"NYG","p":"WR","pr":83,"b":8,"adp":213},{"id":214,"n":"Jack Bech","t":"LV","p":"WR","pr":84,"b":13,"adp":214},{"id":215,"n":"Houston Texans","t":"HOU","p":"DST","pr":1,"b":8,"adp":215},{"id":216,"n":"Chris Brooks","t":"GB","p":"RB","pr":73,"b":11,"adp":216},{"id":217,"n":"Denver Broncos","t":"DEN","p":"DST","pr":2,"b":10,"adp":217},{"id":218,"n":"Los Angeles Rams","t":"LAR","p":"DST","pr":3,"b":11,"adp":218},{"id":219,"n":"Darnell Washington","t":"PIT","p":"TE","pr":29,"b":9,"adp":219},{"id":220,"n":"Seattle Seahawks","t":"SEA","p":"DST","pr":4,"b":11,"adp":220},{"id":221,"n":"Chimere Dike","t":"TEN","p":"WR","pr":85,"b":9,"adp":221},{"id":222,"n":"J.J. McCarthy","t":"MIN","p":"QB","pr":31,"b":6,"adp":222},{"id":223,"n":"Skyler Bell","t":"BUF","p":"WR","pr":86,"b":7,"adp":223},{"id":224,"n":"Dawson Knox","t":"BUF","p":"TE","pr":30,"b":7,"adp":224},{"id":225,"n":"Devontez Walker","t":"BAL","p":"WR","pr":87,"b":13,"adp":225},{"id":226,"n":"Carson Beck","t":"ARI","p":"QB","pr":32,"b":14,"adp":226},{"id":227,"n":"Philadelphia Eagles","t":"PHI","p":"DST","pr":5,"b":10,"adp":227},{"id":228,"n":"New England Patriots","t":"NE","p":"DST","pr":6,"b":11,"adp":228},{"id":229,"n":"Pittsburgh Steelers","t":"PIT","p":"DST","pr":7,"b":9,"adp":229},{"id":230,"n":"Justin Fields","t":"KC","p":"QB","pr":33,"b":5,"adp":230},{"id":231,"n":"Mac Jones","t":"SF","p":"QB","pr":34,"b":8,"adp":231},{"id":232,"n":"Baltimore Ravens","t":"BAL","p":"DST","pr":8,"b":13,"adp":232},{"id":233,"n":"Minnesota Vikings","t":"MIN","p":"DST","pr":9,"b":6,"adp":233},{"id":234,"n":"Jacksonville Jaguars","t":"JAX","p":"DST","pr":10,"b":7,"adp":234},{"id":235,"n":"Cade Otton","t":"TB","p":"TE","pr":31,"b":10,"adp":235},{"id":236,"n":"Los Angeles Chargers","t":"LAC","p":"DST","pr":11,"b":7,"adp":236},{"id":237,"n":"Tank Dell","t":"HOU","p":"WR","pr":88,"b":8,"adp":237},{"id":238,"n":"Darnell Mooney","t":"NYG","p":"WR","pr":89,"b":8,"adp":238},{"id":239,"n":"Dontayvion Wicks","t":"PHI","p":"WR","pr":90,"b":10,"adp":239},{"id":240,"n":"Geno Smith","t":"NYJ","p":"QB","pr":35,"b":13,"adp":240},{"id":241,"n":"Colby Parkinson","t":"LAR","p":"TE","pr":32,"b":11,"adp":241},{"id":242,"n":"De'Zhaun Stribling","t":"SF","p":"WR","pr":91,"b":8,"adp":242},{"id":243,"n":"Detroit Lions","t":"DET","p":"DST","pr":12,"b":6,"adp":243},{"id":244,"n":"Tua Tagovailoa","t":"ATL","p":"QB","pr":36,"b":11,"adp":244},{"id":245,"n":"David Njoku","t":"LAC","p":"TE","pr":33,"b":7,"adp":245},{"id":246,"n":"Troy Franklin","t":"DEN","p":"WR","pr":92,"b":10,"adp":246},{"id":247,"n":"Green Bay Packers","t":"GB","p":"DST","pr":13,"b":11,"adp":247},{"id":248,"n":"Christian Kirk","t":"SF","p":"WR","pr":93,"b":8,"adp":248},{"id":249,"n":"Kansas City Chiefs","t":"KC","p":"DST","pr":14,"b":5,"adp":249},{"id":250,"n":"Evan Engram","t":"DEN","p":"TE","pr":34,"b":10,"adp":250},{"id":251,"n":"Eli Stowers","t":"PHI","p":"TE","pr":35,"b":10,"adp":251},{"id":252,"n":"Ted Hurst","t":"TB","p":"WR","pr":94,"b":10,"adp":252},{"id":253,"n":"Mike Gesicki","t":"CIN","p":"TE","pr":36,"b":6,"adp":253},{"id":254,"n":"Buffalo Bills","t":"BUF","p":"DST","pr":15,"b":7,"adp":254},{"id":255,"n":"Keon Coleman","t":"BUF","p":"WR","pr":95,"b":7,"adp":255},{"id":256,"n":"Jake Tonges","t":"SF","p":"TE","pr":37,"b":8,"adp":256},{"id":257,"n":"Keenan Allen","t":"FA","p":"WR","pr":96,"b":0,"adp":257},{"id":258,"n":"Kirk Cousins","t":"LV","p":"QB","pr":37,"b":13,"adp":258},{"id":259,"n":"Chris Bell","t":"MIA","p":"WR","pr":97,"b":6,"adp":259},{"id":260,"n":"Samaje Perine","t":"CIN","p":"RB","pr":74,"b":6,"adp":260},{"id":261,"n":"Emari Demercado","t":"KC","p":"RB","pr":75,"b":5,"adp":261},{"id":262,"n":"Deshaun Watson","t":"CLE","p":"QB","pr":38,"b":11,"adp":262},{"id":263,"n":"Dallas Cowboys","t":"DAL","p":"DST","pr":16,"b":14,"adp":263},{"id":264,"n":"Michael Penix Jr.","t":"ATL","p":"QB","pr":39,"b":11,"adp":264},{"id":265,"n":"Tyquan Thornton","t":"KC","p":"WR","pr":98,"b":5,"adp":265},{"id":266,"n":"LeQuint Allen","t":"JAX","p":"RB","pr":76,"b":7,"adp":266},{"id":267,"n":"New York Giants","t":"NYG","p":"DST","pr":17,"b":8,"adp":267},{"id":268,"n":"Tory Horton","t":"SEA","p":"WR","pr":99,"b":11,"adp":268},{"id":269,"n":"Ty Johnson","t":"BUF","p":"RB","pr":77,"b":7,"adp":269},{"id":270,"n":"Mason Taylor","t":"NYJ","p":"TE","pr":38,"b":13,"adp":270},{"id":271,"n":"DJ Giddens","t":"IND","p":"RB","pr":78,"b":13,"adp":271},{"id":272,"n":"Jalen Tolbert","t":"MIA","p":"WR","pr":100,"b":6,"adp":272},{"id":273,"n":"Chris Brazzell II","t":"CAR","p":"WR","pr":101,"b":5,"adp":273},{"id":274,"n":"Ollie Gordon","t":"MIA","p":"RB","pr":79,"b":6,"adp":274},{"id":275,"n":"Isaiah Davis","t":"NYJ","p":"RB","pr":80,"b":13,"adp":275},{"id":276,"n":"Theo Johnson","t":"NYG","p":"TE","pr":39,"b":8,"adp":276},{"id":277,"n":"Elijah Sarratt","t":"BAL","p":"WR","pr":102,"b":13,"adp":277},{"id":278,"n":"Michael Mayer","t":"LV","p":"TE","pr":40,"b":13,"adp":278},{"id":279,"n":"Ja'Kobi Lane","t":"BAL","p":"WR","pr":103,"b":13,"adp":279},{"id":280,"n":"Hollywood Brown","t":"PHI","p":"WR","pr":104,"b":10,"adp":280},{"id":281,"n":"Devaughn Vele","t":"NO","p":"WR","pr":105,"b":8,"adp":281},{"id":282,"n":"Malik Davis","t":"DAL","p":"RB","pr":81,"b":14,"adp":282},{"id":283,"n":"Cole Kmet","t":"CHI","p":"TE","pr":41,"b":10,"adp":283},{"id":284,"n":"Andrei Iosivas","t":"CIN","p":"WR","pr":106,"b":6,"adp":284},{"id":285,"n":"Jahan Dotson","t":"ATL","p":"WR","pr":107,"b":11,"adp":285},{"id":286,"n":"Zavion Thomas","t":"CHI","p":"WR","pr":108,"b":10,"adp":286},{"id":287,"n":"Elic Ayomanor","t":"TEN","p":"WR","pr":109,"b":9,"adp":287},{"id":288,"n":"Najee Harris","t":"FA","p":"RB","pr":82,"b":0,"adp":288},{"id":289,"n":"Kaleb Johnson","t":"PIT","p":"RB","pr":83,"b":9,"adp":289},{"id":290,"n":"Eli Heidenreich","t":"PIT","p":"RB","pr":84,"b":9,"adp":290},{"id":291,"n":"Brandon Aubrey","t":"DAL","p":"K","pr":1,"b":14,"adp":291},{"id":292,"n":"Tez Johnson","t":"TB","p":"WR","pr":110,"b":10,"adp":292},{"id":293,"n":"Ty Simpson","t":"LAR","p":"QB","pr":40,"b":11,"adp":293},{"id":294,"n":"Cameron Dicker","t":"LAC","p":"K","pr":2,"b":7,"adp":294},{"id":295,"n":"Ka'imi Fairbairn","t":"HOU","p":"K","pr":3,"b":8,"adp":295},{"id":296,"n":"Jason Myers","t":"SEA","p":"K","pr":4,"b":11,"adp":296},{"id":297,"n":"Cam Little","t":"JAX","p":"K","pr":5,"b":7,"adp":297},{"id":298,"n":"Eddy Pineiro","t":"SF","p":"K","pr":6,"b":8,"adp":298},{"id":299,"n":"Tyler Loop","t":"BAL","p":"K","pr":7,"b":13,"adp":299},{"id":300,"n":"Jake Bates","t":"DET","p":"K","pr":8,"b":6,"adp":300}];
+const STATS = {"28":{"g":17,"fp":364.6,"rows":[["Pass yds","3,668"],["Pass TD","25"],["INT","10"],["Rush yds","579"],["Rush TD","14"]]},"59":{"g":17,"fp":352.0,"rows":[["Pass yds","4,394"],["Pass TD","31"],["INT","8"],["Rush yds","450"],["Rush TD","4"]]},"95":{"g":17,"fp":350.4,"rows":[["Pass yds","4,707"],["Pass TD","46"],["INT","8"],["Rush yds","1"],["Rush TD","0"]]},"85":{"g":17,"fp":338.2,"rows":[["Pass yds","4,007"],["Pass TD","29"],["INT","12"],["Rush yds","359"],["Rush TD","9"]]},"71":{"g":17,"fp":318.7,"rows":[["Pass yds","3,942"],["Pass TD","27"],["INT","7"],["Rush yds","388"],["Rush TD","3"]]},"84":{"g":17,"fp":313.8,"rows":[["Pass yds","4,552"],["Pass TD","30"],["INT","10"],["Rush yds","177"],["Rush TD","2"]]},"108":{"g":17,"fp":304.8,"rows":[["Pass yds","3,931"],["Pass TD","25"],["INT","11"],["Rush yds","356"],["Rush TD","5"]]},"68":{"g":16,"fp":299.1,"rows":[["Pass yds","3,224"],["Pass TD","25"],["INT","6"],["Rush yds","421"],["Rush TD","8"]]},"112":{"g":17,"fp":297.1,"rows":[["Pass yds","4,564"],["Pass TD","34"],["INT","8"],["Rush yds","45"],["Rush TD","0"]]},"83":{"g":16,"fp":286.9,"rows":[["Pass yds","3,727"],["Pass TD","26"],["INT","13"],["Rush yds","498"],["Rush TD","2"]]},"102":{"g":14,"fp":285.7,"rows":[["Pass yds","3,587"],["Pass TD","22"],["INT","11"],["Rush yds","422"],["Rush TD","5"]]},"125":{"g":17,"fp":271.9,"rows":[["Pass yds","3,693"],["Pass TD","26"],["INT","11"],["Rush yds","382"],["Rush TD","1"]]},"92":{"g":14,"fp":241.6,"rows":[["Pass yds","2,272"],["Pass TD","15"],["INT","5"],["Rush yds","487"],["Rush TD","9"]]},"127":{"g":15,"fp":235.1,"rows":[["Pass yds","3,381"],["Pass TD","23"],["INT","6"],["Rush yds","199"],["Rush TD","0"]]},"161":{"g":17,"fp":235.4,"rows":[["Pass yds","4,048"],["Pass TD","25"],["INT","14"],["Rush yds","95"],["Rush TD","0"]]},"189":{"g":14,"fp":227.4,"rows":[["Pass yds","3,366"],["Pass TD","23"],["INT","8"],["Rush yds","168"],["Rush TD","1"]]},"151":{"g":13,"fp":226.4,"rows":[["Pass yds","3,101"],["Pass TD","19"],["INT","8"],["Rush yds","164"],["Rush TD","5"]]},"191":{"g":16,"fp":227.1,"rows":[["Pass yds","3,322"],["Pass TD","24"],["INT","7"],["Rush yds","61"],["Rush TD","1"]]},"163":{"g":16,"fp":218.0,"rows":[["Pass yds","3,011"],["Pass TD","23"],["INT","11"],["Rush yds","216"],["Rush TD","2"]]},"48":{"g":13,"fp":214.9,"rows":[["Pass yds","2,549"],["Pass TD","21"],["INT","7"],["Rush yds","349"],["Rush TD","2"]]},"152":{"g":14,"fp":208.5,"rows":[["Pass yds","3,041"],["Pass TD","19"],["INT","8"],["Rush yds","209"],["Rush TD","1"]]},"159":{"g":17,"fp":186.7,"rows":[["Pass yds","3,169"],["Pass TD","15"],["INT","7"],["Rush yds","159"],["Rush TD","2"]]},"94":{"g":9,"fp":177.4,"rows":[["Pass yds","2,167"],["Pass TD","20"],["INT","10"],["Rush yds","147"],["Rush TD","3"]]},"240":{"g":15,"fp":173.9,"rows":[["Pass yds","3,025"],["Pass TD","19"],["INT","17"],["Rush yds","109"],["Rush TD","0"]]},"244":{"g":14,"fp":160.7,"rows":[["Pass yds","2,660"],["Pass TD","20"],["INT","15"],["Rush yds","43"],["Rush TD","0"]]},"128":{"g":11,"fp":158.0,"rows":[["Pass yds","2,384"],["Pass TD","10"],["INT","6"],["Rush yds","186"],["Rush TD","3"]]},"230":{"g":9,"fp":142.7,"rows":[["Pass yds","1,259"],["Pass TD","7"],["INT","1"],["Rush yds","383"],["Rush TD","4"]]},"62":{"g":8,"fp":134.5,"rows":[["Pass yds","1,809"],["Pass TD","17"],["INT","5"],["Rush yds","41"],["Rush TD","0"]]},"231":{"g":11,"fp":130.0,"rows":[["Pass yds","2,151"],["Pass TD","13"],["INT","6"],["Rush yds","60"],["Rush TD","0"]]},"222":{"g":10,"fp":125.4,"rows":[["Pass yds","1,632"],["Pass TD","11"],["INT","12"],["Rush yds","181"],["Rush TD","4"]]},"264":{"g":9,"fp":120.3,"rows":[["Pass yds","1,982"],["Pass TD","9"],["INT","3"],["Rush yds","70"],["Rush TD","1"]]},"64":{"g":7,"fp":114.3,"rows":[["Pass yds","1,262"],["Pass TD","8"],["INT","3"],["Rush yds","278"],["Rush TD","2"]]},"6":{"g":17,"fp":416.6,"rows":[["Carries","311"],["Rush yds","1,202"],["Rush TD","10"],["Rec","102"],["Rec yds","924"],["Rec TD","7"]]},"2":{"g":17,"fp":370.8,"rows":[["Carries","287"],["Rush yds","1,478"],["Rush TD","7"],["Rec","79"],["Rec yds","820"],["Rec TD","4"]]},"1":{"g":17,"fp":366.9,"rows":[["Carries","243"],["Rush yds","1,223"],["Rush TD","13"],["Rec","77"],["Rec yds","616"],["Rec TD","5"]]},"8":{"g":17,"fp":362.3,"rows":[["Carries","323"],["Rush yds","1,585"],["Rush TD","18"],["Rec","46"],["Rec yds","378"],["Rec TD","2"]]},"15":{"g":16,"fp":322.8,"rows":[["Carries","238"],["Rush yds","1,350"],["Rush TD","8"],["Rec","67"],["Rec yds","488"],["Rec TD","4"]]},"12":{"g":17,"fp":302.2,"rows":[["Carries","309"],["Rush yds","1,621"],["Rush TD","12"],["Rec","33"],["Rec yds","291"],["Rec TD","2"]]},"16":{"g":17,"fp":282.6,"rows":[["Carries","232"],["Rush yds","1,019"],["Rush TD","6"],["Rec","69"],["Rec yds","437"],["Rec TD","5"]]},"21":{"g":17,"fp":279.5,"rows":[["Carries","307"],["Rush yds","1,595"],["Rush TD","16"],["Rec","15"],["Rec yds","150"],["Rec TD","0"]]},"31":{"g":17,"fp":263.3,"rows":[["Carries","259"],["Rush yds","1,252"],["Rush TD","10"],["Rec","36"],["Rec yds","281"],["Rec TD","3"]]},"40":{"g":17,"fp":253.9,"rows":[["Carries","260"],["Rush yds","1,107"],["Rush TD","7"],["Rec","36"],["Rec yds","292"],["Rec TD","6"]]},"10":{"g":17,"fp":245.1,"rows":[["Carries","266"],["Rush yds","975"],["Rush TD","5"],["Rec","55"],["Rec yds","346"],["Rec TD","5"]]},"33":{"g":16,"fp":242.8,"rows":[["Carries","252"],["Rush yds","1,201"],["Rush TD","11"],["Rec","35"],["Rec yds","137"],["Rec TD","2"]]},"35":{"g":15,"fp":237.1,"rows":[["Carries","234"],["Rush yds","929"],["Rush TD","13"],["Rec","36"],["Rec yds","282"],["Rec TD","1"]]},"13":{"g":16,"fp":232.3,"rows":[["Carries","280"],["Rush yds","1,140"],["Rush TD","7"],["Rec","37"],["Rec yds","273"],["Rec TD","2"]]},"49":{"g":16,"fp":228.6,"rows":[["Carries","223"],["Rush yds","1,087"],["Rush TD","9"],["Rec","34"],["Rec yds","299"],["Rec TD","1"]]},"98":{"g":17,"fp":221.3,"rows":[["Carries","114"],["Rush yds","537"],["Rush TD","5"],["Rec","73"],["Rec yds","486"],["Rec TD","3"]]},"69":{"g":16,"fp":217.1,"rows":[["Carries","211"],["Rush yds","958"],["Rush TD","6"],["Rec","40"],["Rec yds","333"],["Rec TD","2"]]},"87":{"g":17,"fp":216.3,"rows":[["Carries","236"],["Rush yds","1,076"],["Rush TD","6"],["Rec","39"],["Rec yds","297"],["Rec TD","1"]]},"30":{"g":16,"fp":207.7,"rows":[["Carries","243"],["Rush yds","1,065"],["Rush TD","4"],["Rec","36"],["Rec yds","350"],["Rec TD","1"]]},"86":{"g":17,"fp":206.6,"rows":[["Carries","146"],["Rush yds","540"],["Rush TD","7"],["Rec","47"],["Rec yds","356"],["Rec TD","5"]]},"54":{"g":17,"fp":206.2,"rows":[["Carries","180"],["Rush yds","911"],["Rush TD","9"],["Rec","35"],["Rec yds","221"],["Rec TD","1"]]},"19":{"g":17,"fp":191.9,"rows":[["Carries","221"],["Rush yds","1,027"],["Rush TD","5"],["Rec","31"],["Rec yds","282"],["Rec TD","0"]]},"72":{"g":17,"fp":185.8,"rows":[["Carries","242"],["Rush yds","1,082"],["Rush TD","5"],["Rec","33"],["Rec yds","206"],["Rec TD","0"]]},"143":{"g":16,"fp":181.4,"rows":[["Carries","184"],["Rush yds","730"],["Rush TD","12"],["Rec","20"],["Rec yds","144"],["Rec TD","0"]]},"78":{"g":14,"fp":178.8,"rows":[["Carries","130"],["Rush yds","603"],["Rush TD","7"],["Rec","32"],["Rec yds","345"],["Rec TD","2"]]},"51":{"g":14,"fp":169.8,"rows":[["Carries","230"],["Rush yds","827"],["Rush TD","7"],["Rec","26"],["Rec yds","171"],["Rec TD","0"]]},"50":{"g":17,"fp":166.9,"rows":[["Carries","158"],["Rush yds","716"],["Rush TD","8"],["Rec","24"],["Rec yds","192"],["Rec TD","0"]]},"133":{"g":15,"fp":160.8,"rows":[["Carries","176"],["Rush yds","740"],["Rush TD","2"],["Rec","36"],["Rec yds","288"],["Rec TD","2"]]},"137":{"g":16,"fp":151.1,"rows":[["Carries","196"],["Rush yds","703"],["Rush TD","2"],["Rec","24"],["Rec yds","208"],["Rec TD","3"]]},"96":{"g":17,"fp":146.7,"rows":[["Carries","169"],["Rush yds","783"],["Rush TD","5"],["Rec","18"],["Rec yds","164"],["Rec TD","0"]]},"99":{"g":17,"fp":143.0,"rows":[["Carries","132"],["Rush yds","572"],["Rush TD","4"],["Rec","40"],["Rec yds","218"],["Rec TD","0"]]},"122":{"g":17,"fp":140.3,"rows":[["Carries","175"],["Rush yds","805"],["Rush TD","8"],["Rec","9"],["Rec yds","68"],["Rec TD","0"]]},"56":{"g":10,"fp":138.5,"rows":[["Carries","173"],["Rush yds","588"],["Rush TD","1"],["Rec","30"],["Rec yds","277"],["Rec TD","3"]]},"14":{"g":9,"fp":135.7,"rows":[["Carries","124"],["Rush yds","545"],["Rush TD","4"],["Rec","32"],["Rec yds","192"],["Rec TD","1"]]},"115":{"g":16,"fp":128.9,"rows":[["Carries","159"],["Rush yds","758"],["Rush TD","6"],["Rec","14"],["Rec yds","51"],["Rec TD","0"]]},"42":{"g":8,"fp":127.7,"rows":[["Carries","101"],["Rush yds","410"],["Rush TD","5"],["Rec","24"],["Rec yds","207"],["Rec TD","2"]]},"77":{"g":15,"fp":125.4,"rows":[["Carries","134"],["Rush yds","511"],["Rush TD","1"],["Rec","30"],["Rec yds","223"],["Rec TD","3"]]},"146":{"g":17,"fp":123.0,"rows":[["Carries","143"],["Rush yds","514"],["Rush TD","8"],["Rec","14"],["Rec yds","96"],["Rec TD","0"]]},"103":{"g":17,"fp":122.2,"rows":[["Carries","145"],["Rush yds","746"],["Rush TD","6"],["Rec","8"],["Rec yds","36"],["Rec TD","0"]]},"121":{"g":12,"fp":118.7,"rows":[["Carries","132"],["Rush yds","548"],["Rush TD","2"],["Rec","28"],["Rec yds","199"],["Rec TD","1"]]},"194":{"g":13,"fp":117.9,"rows":[["Carries","155"],["Rush yds","643"],["Rush TD","3"],["Rec","16"],["Rec yds","136"],["Rec TD","1"]]},"100":{"g":10,"fp":115.9,"rows":[["Carries","153"],["Rush yds","772"],["Rush TD","4"],["Rec","11"],["Rec yds","37"],["Rec TD","0"]]},"140":{"g":13,"fp":111.7,"rows":[["Carries","72"],["Rush yds","283"],["Rush TD","2"],["Rec","45"],["Rec yds","264"],["Rec TD","0"]]},"147":{"g":11,"fp":100.7,"rows":[["Carries","131"],["Rush yds","471"],["Rush TD","1"],["Rec","33"],["Rec yds","186"],["Rec TD","0"]]},"269":{"g":17,"fp":100.3,"rows":[["Carries","50"],["Rush yds","200"],["Rush TD","3"],["Rec","24"],["Rec yds","263"],["Rec TD","2"]]},"204":{"g":17,"fp":94.5,"rows":[["Carries","125"],["Rush yds","496"],["Rush TD","3"],["Rec","15"],["Rec yds","99"],["Rec TD","0"]]},"132":{"g":13,"fp":92.0,"rows":[["Carries","112"],["Rush yds","500"],["Rush TD","6"],["Rec","3"],["Rec yds","30"],["Rec TD","0"]]},"193":{"g":17,"fp":91.4,"rows":[["Carries","86"],["Rush yds","320"],["Rush TD","7"],["Rec","8"],["Rec yds","34"],["Rec TD","1"]]},"58":{"g":15,"fp":88.6,"rows":[["Carries","83"],["Rush yds","307"],["Rush TD","5"],["Rec","10"],["Rec yds","79"],["Rec TD","2"]]},"177":{"g":15,"fp":87.6,"rows":[["Carries","65"],["Rush yds","175"],["Rush TD","0"],["Rec","33"],["Rec yds","271"],["Rec TD","2"]]},"141":{"g":13,"fp":87.3,"rows":[["Carries","118"],["Rush yds","462"],["Rush TD","1"],["Rec","19"],["Rec yds","101"],["Rec TD","1"]]},"260":{"g":15,"fp":77.9,"rows":[["Carries","84"],["Rush yds","382"],["Rush TD","3"],["Rec","17"],["Rec yds","87"],["Rec TD","0"]]},"275":{"g":16,"fp":71.2,"rows":[["Carries","43"],["Rush yds","236"],["Rush TD","1"],["Rec","21"],["Rec yds","186"],["Rec TD","0"]]},"201":{"g":10,"fp":65.2,"rows":[["Carries","18"],["Rush yds","93"],["Rush TD","2"],["Rec","21"],["Rec yds","169"],["Rec TD","1"]]},"182":{"g":17,"fp":64.1,"rows":[["Carries","58"],["Rush yds","275"],["Rush TD","0"],["Rec","10"],["Rec yds","86"],["Rec TD","2"]]},"162":{"g":17,"fp":62.5,"rows":[["Carries","92"],["Rush yds","400"],["Rush TD","2"],["Rec","8"],["Rec yds","25"],["Rec TD","0"]]},"261":{"g":13,"fp":58.3,"rows":[["Carries","44"],["Rush yds","312"],["Rush TD","0"],["Rec","13"],["Rec yds","101"],["Rec TD","1"]]},"174":{"g":13,"fp":55.4,"rows":[["Carries","59"],["Rush yds","341"],["Rush TD","1"],["Rec","9"],["Rec yds","63"],["Rec TD","0"]]},"274":{"g":17,"fp":54.1,"rows":[["Carries","70"],["Rush yds","199"],["Rush TD","3"],["Rec","7"],["Rec yds","32"],["Rec TD","1"]]},"157":{"g":16,"fp":53.8,"rows":[["Carries","63"],["Rush yds","356"],["Rush TD","2"],["Rec","3"],["Rec yds","32"],["Rec TD","0"]]},"212":{"g":11,"fp":48.2,"rows":[["Carries","70"],["Rush yds","288"],["Rush TD","2"],["Rec","5"],["Rec yds","44"],["Rec TD","0"]]},"282":{"g":10,"fp":40.6,"rows":[["Carries","52"],["Rush yds","250"],["Rush TD","2"],["Rec","2"],["Rec yds","16"],["Rec TD","0"]]},"173":{"g":4,"fp":33.3,"rows":[["Carries","32"],["Rush yds","95"],["Rush TD","1"],["Rec","8"],["Rec yds","38"],["Rec TD","1"]]},"216":{"g":17,"fp":32.7,"rows":[["Carries","27"],["Rush yds","106"],["Rush TD","0"],["Rec","13"],["Rec yds","91"],["Rec TD","0"]]},"266":{"g":17,"fp":24.8,"rows":[["Carries","23"],["Rush yds","94"],["Rush TD","0"],["Rec","10"],["Rec yds","54"],["Rec TD","0"]]},"203":{"g":10,"fp":20.8,"rows":[["Carries","22"],["Rush yds","73"],["Rush TD","1"],["Rec","2"],["Rec yds","15"],["Rec TD","0"]]},"183":{"g":5,"fp":20.4,"rows":[["Carries","38"],["Rush yds","129"],["Rush TD","1"],["Rec","1"],["Rec yds","5"],["Rec TD","0"]]},"167":{"g":4,"fp":15.3,"rows":[["Carries","18"],["Rush yds","76"],["Rush TD","1"],["Rec","2"],["Rec yds","17"],["Rec TD","0"]]},"288":{"g":3,"fp":11.6,"rows":[["Carries","15"],["Rush yds","61"],["Rush TD","0"],["Rec","3"],["Rec yds","25"],["Rec TD","0"]]},"4":{"g":16,"fp":375.0,"rows":[["Targets","166"],["Rec","129"],["Rec yds","1,715"],["Rec TD","10"],["Rush yds","105"]]},"5":{"g":17,"fp":359.9,"rows":[["Targets","163"],["Rec","119"],["Rec yds","1,793"],["Rec TD","10"]]},"7":{"g":17,"fp":324.0,"rows":[["Targets","172"],["Rec","117"],["Rec yds","1,401"],["Rec TD","11"]]},"3":{"g":16,"fp":313.6,"rows":[["Targets","185"],["Rec","125"],["Rec yds","1,412"],["Rec TD","8"]]},"25":{"g":17,"fp":291.9,"rows":[["Targets","137"],["Rec","93"],["Rec yds","1,429"],["Rec TD","9"]]},"29":{"g":16,"fp":269.0,"rows":[["Targets","156"],["Rec","100"],["Rec yds","1,163"],["Rec TD","9"]]},"32":{"g":17,"fp":243.3,"rows":[["Targets","118"],["Rec","86"],["Rec yds","1,211"],["Rec TD","5"],["Rush yds","62"]]},"22":{"g":15,"fp":226.2,"rows":[["Targets","120"],["Rec","71"],["Rec yds","1,117"],["Rec TD","6"]]},"47":{"g":14,"fp":222.9,"rows":[["Targets","114"],["Rec","60"],["Rec yds","789"],["Rec TD","14"]]},"104":{"g":17,"fp":220.6,"rows":[["Targets","126"],["Rec","78"],["Rec yds","1,006"],["Rec TD","7"]]},"20":{"g":15,"fp":220.3,"rows":[["Targets","121"],["Rec","78"],["Rec yds","1,003"],["Rec TD","7"]]},"52":{"g":17,"fp":219.9,"rows":[["Targets","102"],["Rec","65"],["Rec yds","1,117"],["Rec TD","7"]]},"80":{"g":17,"fp":219.7,"rows":[["Targets","124"],["Rec","74"],["Rec yds","1,017"],["Rec TD","7"]]},"111":{"g":16,"fp":217.9,"rows":[["Targets","140"],["Rec","92"],["Rec yds","1,014"],["Rec TD","4"]]},"36":{"g":15,"fp":211.6,"rows":[["Targets","98"],["Rec","59"],["Rec yds","846"],["Rec TD","11"]]},"38":{"g":17,"fp":211.4,"rows":[["Targets","122"],["Rec","70"],["Rec yds","1,014"],["Rec TD","7"]]},"135":{"g":17,"fp":210.3,"rows":[["Targets","102"],["Rec","85"],["Rec yds","1,013"],["Rec TD","4"]]},"90":{"g":17,"fp":202.4,"rows":[["Targets","111"],["Rec","80"],["Rec yds","784"],["Rec TD","7"]]},"18":{"g":12,"fp":201.9,"rows":[["Targets","112"],["Rec","68"],["Rec yds","919"],["Rec TD","7"]]},"27":{"g":17,"fp":201.8,"rows":[["Targets","113"],["Rec","77"],["Rec yds","1,008"],["Rec TD","4"]]},"11":{"g":17,"fp":201.5,"rows":[["Targets","141"],["Rec","84"],["Rec yds","1,048"],["Rec TD","2"]]},"9":{"g":14,"fp":200.9,"rows":[["Targets","117"],["Rec","75"],["Rec yds","1,077"],["Rec TD","3"]]},"34":{"g":17,"fp":195.7,"rows":[["Targets","127"],["Rec","63"],["Rec yds","938"],["Rec TD","6"]]},"44":{"g":16,"fp":194.1,"rows":[["Targets","100"],["Rec","64"],["Rec yds","910"],["Rec TD","6"]]},"168":{"g":16,"fp":188.2,"rows":[["Targets","99"],["Rec","72"],["Rec yds","727"],["Rec TD","5"],["Rush yds","75"]]},"74":{"g":15,"fp":187.2,"rows":[["Targets","99"],["Rec","59"],["Rec yds","850"],["Rec TD","6"]]},"70":{"g":16,"fp":184.7,"rows":[["Targets","95"],["Rec","58"],["Rec yds","847"],["Rec TD","5"]]},"76":{"g":15,"fp":183.3,"rows":[["Targets","84"],["Rec","47"],["Rec yds","1,003"],["Rec TD","6"]]},"257":{"g":17,"fp":182.7,"rows":[["Targets","122"],["Rec","81"],["Rec yds","777"],["Rec TD","4"]]},"43":{"g":16,"fp":180.9,"rows":[["Targets","106"],["Rec","66"],["Rec yds","789"],["Rec TD","6"]]},"246":{"g":17,"fp":177.1,"rows":[["Targets","104"],["Rec","65"],["Rec yds","709"],["Rec TD","6"]]},"110":{"g":16,"fp":175.8,"rows":[["Targets","110"],["Rec","75"],["Rec yds","835"],["Rec TD","3"]]},"160":{"g":15,"fp":173.3,"rows":[["Targets","90"],["Rec","55"],["Rec yds","643"],["Rec TD","9"]]},"88":{"g":14,"fp":171.2,"rows":[["Targets","85"],["Rec","51"],["Rec yds","735"],["Rec TD","8"]]},"55":{"g":17,"fp":170.2,"rows":[["Targets","85"],["Rec","50"],["Rec yds","682"],["Rec TD","6"],["Rush yds","79"]]},"130":{"g":16,"fp":166.4,"rows":[["Targets","95"],["Rec","72"],["Rec yds","719"],["Rec TD","4"]]},"124":{"g":16,"fp":165.4,"rows":[["Targets","85"],["Rec","55"],["Rec yds","724"],["Rec TD","6"]]},"150":{"g":17,"fp":161.7,"rows":[["Targets","92"],["Rec","57"],["Rec yds","696"],["Rec TD","5"],["Rush yds","51"]]},"134":{"g":18,"fp":156.6,"rows":[["Targets","92"],["Rec","59"],["Rec yds","687"],["Rec TD","2"],["Rush yds","69"]]},"26":{"g":8,"fp":150.1,"rows":[["Targets","78"],["Rec","53"],["Rec yds","571"],["Rec TD","5"]]},"60":{"g":12,"fp":146.1,"rows":[["Targets","90"],["Rec","44"],["Rec yds","661"],["Rec TD","6"]]},"67":{"g":14,"fp":138.8,"rows":[["Targets","91"],["Rec","48"],["Rec yds","707"],["Rec TD","2"]]},"280":{"g":16,"fp":137.7,"rows":[["Targets","74"],["Rec","49"],["Rec yds","587"],["Rec TD","5"]]},"105":{"g":16,"fp":136.4,"rows":[["Targets","88"],["Rec","58"],["Rec yds","566"],["Rec TD","4"]]},"107":{"g":14,"fp":135.1,"rows":[["Targets","79"],["Rec","42"],["Rec yds","610"],["Rec TD","3"],["Rush yds","81"]]},"61":{"g":10,"fp":132.4,"rows":[["Targets","55"],["Rec","35"],["Rec yds","611"],["Rec TD","6"]]},"129":{"g":17,"fp":129.5,"rows":[["Targets","68"],["Rec","41"],["Rec yds","525"],["Rec TD","6"]]},"46":{"g":15,"fp":127.9,"rows":[["Targets","60"],["Rec","47"],["Rec yds","652"],["Rec TD","2"]]},"66":{"g":12,"fp":127.8,"rows":[["Targets","73"],["Rec","41"],["Rec yds","608"],["Rec TD","4"]]},"221":{"g":17,"fp":126.1,"rows":[["Targets","74"],["Rec","48"],["Rec yds","423"],["Rec TD","4"]]},"200":{"g":14,"fp":124.1,"rows":[["Targets","46"],["Rec","33"],["Rec yds","551"],["Rec TD","6"]]},"165":{"g":17,"fp":120.7,"rows":[["Targets","106"],["Rec","50"],["Rec yds","602"],["Rec TD","2"]]},"202":{"g":16,"fp":117.3,"rows":[["Targets","70"],["Rec","47"],["Rec yds","593"],["Rec TD","2"]]},"184":{"g":17,"fp":116.7,"rows":[["Targets","65"],["Rec","46"],["Rec yds","317"],["Rec TD","3"],["Rush yds","110"]]},"287":{"g":16,"fp":116.5,"rows":[["Targets","89"],["Rec","41"],["Rec yds","515"],["Rec TD","4"]]},"45":{"g":10,"fp":114.2,"rows":[["Targets","60"],["Rec","38"],["Rec yds","582"],["Rec TD","3"]]},"178":{"g":15,"fp":114.0,"rows":[["Targets","56"],["Rec","40"],["Rec yds","475"],["Rec TD","4"]]},"113":{"g":14,"fp":109.9,"rows":[["Targets","73"],["Rec","42"],["Rec yds","532"],["Rec TD","1"],["Rush yds","87"]]},"255":{"g":13,"fp":102.4,"rows":[["Targets","59"],["Rec","38"],["Rec yds","404"],["Rec TD","4"]]},"155":{"g":17,"fp":100.7,"rows":[["Targets","53"],["Rec","29"],["Rec yds","444"],["Rec TD","4"]]},"37":{"g":7,"fp":99.5,"rows":[["Targets","59"],["Rec","36"],["Rec yds","395"],["Rec TD","4"]]},"292":{"g":16,"fp":92.6,"rows":[["Targets","44"],["Rec","28"],["Rec yds","322"],["Rec TD","5"]]},"131":{"g":11,"fp":90.4,"rows":[["Targets","43"],["Rec","33"],["Rec yds","394"],["Rec TD","3"]]},"284":{"g":17,"fp":89.9,"rows":[["Targets","58"],["Rec","33"],["Rec yds","435"],["Rec TD","2"]]},"101":{"g":10,"fp":88.6,"rows":[["Targets","53"],["Rec","36"],["Rec yds","528"],["Rec TD","0"]]},"170":{"g":16,"fp":87.9,"rows":[["Targets","74"],["Rec","33"],["Rec yds","453"],["Rec TD","2"]]},"57":{"g":8,"fp":84.8,"rows":[["Targets","61"],["Rec","30"],["Rec yds","368"],["Rec TD","3"]]},"91":{"g":9,"fp":83.0,"rows":[["Targets","51"],["Rec","33"],["Rec yds","360"],["Rec TD","2"]]},"238":{"g":15,"fp":82.3,"rows":[["Targets","72"],["Rec","32"],["Rec yds","443"],["Rec TD","1"]]},"265":{"g":14,"fp":80.8,"rows":[["Targets","37"],["Rec","19"],["Rec yds","438"],["Rec TD","3"]]},"180":{"g":17,"fp":75.9,"rows":[["Targets","27"],["Rec","16"],["Rec yds","239"],["Rec TD","6"]]},"239":{"g":14,"fp":75.8,"rows":[["Targets","46"],["Rec","30"],["Rec yds","332"],["Rec TD","2"]]},"211":{"g":15,"fp":74.8,"rows":[["Targets","49"],["Rec","31"],["Rec yds","378"],["Rec TD","1"]]},"114":{"g":14,"fp":70.0,"rows":[["Targets","44"],["Rec","29"],["Rec yds","361"],["Rec TD","0"]]},"179":{"g":17,"fp":69.4,"rows":[["Targets","43"],["Rec","30"],["Rec yds","324"],["Rec TD","1"]]},"206":{"g":17,"fp":68.4,"rows":[["Targets","35"],["Rec","26"],["Rec yds","292"],["Rec TD","2"]]},"281":{"g":13,"fp":66.3,"rows":[["Targets","39"],["Rec","25"],["Rec yds","293"],["Rec TD","2"]]},"268":{"g":8,"fp":65.1,"rows":[["Targets","22"],["Rec","13"],["Rec yds","161"],["Rec TD","5"]]},"158":{"g":7,"fp":63.8,"rows":[["Targets","45"],["Rec","28"],["Rec yds","298"],["Rec TD","1"]]},"248":{"g":13,"fp":57.9,"rows":[["Targets","52"],["Rec","28"],["Rec yds","239"],["Rec TD","1"]]},"41":{"g":4,"fp":57.1,"rows":[["Targets","35"],["Rec","18"],["Rec yds","271"],["Rec TD","2"]]},"209":{"g":13,"fp":55.4,"rows":[["Targets","38"],["Rec","19"],["Rec yds","224"],["Rec TD","2"]]},"176":{"g":4,"fp":53.5,"rows":[["Targets","29"],["Rec","21"],["Rec yds","265"],["Rec TD","1"]]},"285":{"g":17,"fp":50.2,"rows":[["Targets","36"],["Rec","18"],["Rec yds","262"],["Rec TD","1"]]},"106":{"g":7,"fp":48.5,"rows":[["Targets","22"],["Rec","19"],["Rec yds","207"],["Rec TD","1"]]},"171":{"g":7,"fp":47.3,"rows":[["Targets","36"],["Rec","17"],["Rec yds","303"],["Rec TD","0"]]},"272":{"g":13,"fp":46.3,"rows":[["Targets","34"],["Rec","18"],["Rec yds","203"],["Rec TD","1"]]},"214":{"g":16,"fp":42.4,"rows":[["Targets","29"],["Rec","20"],["Rec yds","224"],["Rec TD","0"]]},"225":{"g":11,"fp":37.6,"rows":[["Targets","8"],["Rec","6"],["Rec yds","136"],["Rec TD","3"]]},"23":{"g":17,"fp":315.9,"rows":[["Targets","169"],["Rec","126"],["Rec yds","1,239"],["Rec TD","11"]]},"79":{"g":17,"fp":210.8,"rows":[["Targets","118"],["Rec","88"],["Rec yds","928"],["Rec TD","5"]]},"109":{"g":17,"fp":193.2,"rows":[["Targets","108"],["Rec","76"],["Rec yds","851"],["Rec TD","5"]]},"53":{"g":17,"fp":188.5,"rows":[["Targets","112"],["Rec","76"],["Rec yds","817"],["Rec TD","4"]]},"118":{"g":17,"fp":188.1,"rows":[["Targets","102"],["Rec","82"],["Rec yds","600"],["Rec TD","8"]]},"82":{"g":16,"fp":186.4,"rows":[["Targets","107"],["Rec","72"],["Rec yds","731"],["Rec TD","6"]]},"116":{"g":15,"fp":185.1,"rows":[["Targets","82"],["Rec","60"],["Rec yds","591"],["Rec TD","11"]]},"144":{"g":17,"fp":179.9,"rows":[["Targets","102"],["Rec","77"],["Rec yds","889"],["Rec TD","3"]]},"148":{"g":17,"fp":178.8,"rows":[["Targets","87"],["Rec","60"],["Rec yds","768"],["Rec TD","7"]]},"164":{"g":17,"fp":177.7,"rows":[["Targets","106"],["Rec","82"],["Rec yds","777"],["Rec TD","3"]]},"17":{"g":12,"fp":176.2,"rows":[["Targets","86"],["Rec","64"],["Rec yds","680"],["Rec TD","7"]]},"39":{"g":16,"fp":165.1,"rows":[["Targets","82"],["Rec","58"],["Rec yds","713"],["Rec TD","6"]]},"97":{"g":11,"fp":161.5,"rows":[["Targets","69"],["Rec","57"],["Rec yds","628"],["Rec TD","7"]]},"166":{"g":17,"fp":147.3,"rows":[["Targets","68"],["Rec","52"],["Rec yds","519"],["Rec TD","6"]]},"142":{"g":15,"fp":131.4,"rows":[["Targets","69"],["Rec","49"],["Rec yds","664"],["Rec TD","3"]]},"123":{"g":17,"fp":131.0,"rows":[["Targets","70"],["Rec","48"],["Rec yds","422"],["Rec TD","5"]]},"241":{"g":15,"fp":129.8,"rows":[["Targets","56"],["Rec","43"],["Rec yds","408"],["Rec TD","8"]]},"276":{"g":15,"fp":127.8,"rows":[["Targets","74"],["Rec","45"],["Rec yds","528"],["Rec TD","5"]]},"119":{"g":12,"fp":126.1,"rows":[["Targets","49"],["Rec","39"],["Rec yds","571"],["Rec TD","5"]]},"138":{"g":17,"fp":124.0,"rows":[["Targets","79"],["Rec","56"],["Rec yds","560"],["Rec TD","2"]]},"235":{"g":16,"fp":122.2,"rows":[["Targets","81"],["Rec","59"],["Rec yds","572"],["Rec TD","1"]]},"139":{"g":12,"fp":118.0,"rows":[["Targets","60"],["Rec","46"],["Rec yds","540"],["Rec TD","3"]]},"75":{"g":8,"fp":117.2,"rows":[["Targets","44"],["Rec","32"],["Rec yds","489"],["Rec TD","6"]]},"186":{"g":17,"fp":113.6,"rows":[["Targets","54"],["Rec","41"],["Rec yds","486"],["Rec TD","4"]]},"153":{"g":15,"fp":112.8,"rows":[["Targets","66"],["Rec","51"],["Rec yds","438"],["Rec TD","3"]]},"81":{"g":9,"fp":106.9,"rows":[["Targets","49"],["Rec","40"],["Rec yds","489"],["Rec TD","3"]]},"224":{"g":17,"fp":103.7,"rows":[["Targets","49"],["Rec","36"],["Rec yds","417"],["Rec TD","4"]]},"250":{"g":16,"fp":102.8,"rows":[["Targets","76"],["Rec","50"],["Rec yds","461"],["Rec TD","1"]]},"256":{"g":16,"fp":93.3,"rows":[["Targets","46"],["Rec","34"],["Rec yds","293"],["Rec TD","5"]]},"185":{"g":16,"fp":91.7,"rows":[["Targets","55"],["Rec","44"],["Rec yds","357"],["Rec TD","2"]]},"270":{"g":13,"fp":88.9,"rows":[["Targets","65"],["Rec","44"],["Rec yds","369"],["Rec TD","1"]]},"245":{"g":12,"fp":86.3,"rows":[["Targets","48"],["Rec","33"],["Rec yds","293"],["Rec TD","4"]]},"283":{"g":16,"fp":78.7,"rows":[["Targets","48"],["Rec","30"],["Rec yds","347"],["Rec TD","2"]]},"278":{"g":13,"fp":73.8,"rows":[["Targets","50"],["Rec","35"],["Rec yds","328"],["Rec TD","1"]]},"219":{"g":16,"fp":73.4,"rows":[["Targets","43"],["Rec","31"],["Rec yds","364"],["Rec TD","1"]]},"253":{"g":13,"fp":70.7,"rows":[["Targets","42"],["Rec","28"],["Rec yds","307"],["Rec TD","2"]]},"181":{"g":10,"fp":62.8,"rows":[["Targets","33"],["Rec","26"],["Rec yds","335"],["Rec TD","1"]]},"117":{"g":14,"fp":61.7,"rows":[["Targets","36"],["Rec","27"],["Rec yds","307"],["Rec TD","1"]]},"172":{"g":13,"fp":52.1,"rows":[["Targets","25"],["Rec","11"],["Rec yds","231"],["Rec TD","3"]]},"296":{"g":17,"fp":202.0,"rows":[["FG","41/48"],["XP","48"]]},"295":{"g":15,"fp":194.0,"rows":[["FG","44/48"],["XP","28"]]},"291":{"g":17,"fp":187.6,"rows":[["FG","36/42"],["XP","47"]]},"294":{"g":17,"fp":170.0,"rows":[["FG","38/41"],["XP","34"]]},"297":{"g":17,"fp":164.0,"rows":[["FG","30/34"],["XP","50"]]},"300":{"g":17,"fp":152.0,"rows":[["FG","27/34"],["XP","54"]]},"299":{"g":17,"fp":144.0,"rows":[["FG","30/34"],["XP","44"]]},"298":{"g":14,"fp":140.0,"rows":[["FG","28/29"],["XP","34"]]},"220":{"g":17,"fp":179.0,"rows":[["Sacks","47"],["INT","18"],["Fum rec","7"],["Def TD","3"]]},"215":{"g":17,"fp":164.0,"rows":[["Sacks","47"],["INT","19"],["Fum rec","10"],["Def TD","4"]]},"234":{"g":17,"fp":144.0,"rows":[["Sacks","32"],["INT","22"],["Fum rec","9"],["Def TD","2"]]},"217":{"g":17,"fp":143.0,"rows":[["Sacks","68"],["INT","10"],["Fum rec","4"],["Def TD","1"]]},"218":{"g":17,"fp":136.0,"rows":[["Sacks","47"],["INT","16"],["Fum rec","9"],["Def TD","1"]]},"233":{"g":17,"fp":136.0,"rows":[["Sacks","49"],["INT","8"],["Fum rec","13"],["Def TD","2"]]},"227":{"g":17,"fp":135.0,"rows":[["Sacks","42"],["INT","12"],["Fum rec","9"],["Def TD","1"]]},"229":{"g":17,"fp":130.0,"rows":[["Sacks","48"],["INT","15"],["Fum rec","12"],["Def TD","3"]]},"228":{"g":17,"fp":127.0,"rows":[["Sacks","35"],["INT","10"],["Fum rec","9"],["Def TD","2"]]},"254":{"g":17,"fp":110.0,"rows":[["Sacks","36"],["INT","13"],["Fum rec","7"],["Def TD","2"]]},"232":{"g":17,"fp":97.0,"rows":[["Sacks","30"],["INT","11"],["Fum rec","9"],["Def TD","2"]]},"243":{"g":17,"fp":97.0,"rows":[["Sacks","49"],["INT","13"],["Fum rec","6"],["Def TD","0"]]},"249":{"g":17,"fp":92.0,"rows":[["Sacks","35"],["INT","10"],["Fum rec","4"],["Def TD","0"]]},"247":{"g":17,"fp":79.0,"rows":[["Sacks","36"],["INT","7"],["Fum rec","7"],["Def TD","0"]]},"236":{"g":17,"fp":111.0,"rows":[["Sacks","45"],["INT","19"],["Fum rec","4"],["Def TD","0"]]},"263":{"g":17,"fp":59.0,"rows":[["Sacks","35"],["INT","6"],["Fum rec","6"],["Def TD","1"]]},"267":{"g":17,"fp":77.0,"rows":[["Sacks","39"],["INT","9"],["Fum rec","6"],["Def TD","1"]]}};   // 2025 season stats keyed by player id
+/* ---------- state ---------- */
+const DEF_REQ = {QB:1, RB:2, WR:2, TE:1, FLEX:1, K:1, DST:1, BN:6};
+let S = {
+  started:false, teams:10, slot:5, rounds:15, req:{...DEF_REQ},
+  pick:1,                    // current overall pick about to be made
+  actions:[],                // [{id, kind:'taken'|'mine', pick}]
+  queue:[],                  // starred player ids, in priority order
+  ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false}
+};
+const status = {};           // id -> 'taken' | 'mine'
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const posColor = p => `pos-${p}`;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', 1800); }
+function rebuildStatus(){ for(const k in status) delete status[k];
+  for(const a of S.actions) status[a.id]=a.kind; }
+function inQueue(id){ return S.queue.includes(id); }
+function toggleStar(id){
+  const i=S.queue.indexOf(id);
+  if(i>=0){ S.queue.splice(i,1); toast('Removed from queue'); }
+  else { S.queue.push(id); const p=PLAYERS.find(x=>x.id===id); toast(`★ ${p.n} queued`); }
+  renderAll();
+}
+function starButton(id){
+  const b=document.createElement('button');
+  b.className='starbtn'+(inQueue(id)?' on':'');
+  b.textContent=inQueue(id)?'★':'☆';
+  b.onclick=e=>{ e.stopPropagation(); toggleStar(id); };
+  return b;
+}
+function roundOf(pick){ return Math.floor((pick-1)/S.teams)+1; }
+function pickInRound(pick){ return ((pick-1)%S.teams)+1; }
+function teamOnClock(pick){ const r=roundOf(pick), p=pickInRound(pick);
+  return (r%2===1) ? p : S.teams-p+1; }
+function myPickNumbers(){ const out=[];
+  for(let r=1;r<=S.rounds;r++){ const p=(r%2===1)?S.slot:S.teams-S.slot+1; out.push((r-1)*S.teams+p); }
+  return out; }
+function nextMyPicks(n){ return myPickNumbers().filter(x=>x>=S.pick).slice(0,n); }
+function totalPicks(){ return S.teams*S.rounds; }
+/* ---------- tiers (ADP-gap based, per position) ---------- */
+const tiers = {};
+(function(){
+  const byPos = {};
+  for(const p of PLAYERS) (byPos[p.p]=byPos[p.p]||[]).push(p);
+  for(const pos in byPos){
+    const list = byPos[pos].sort((a,b)=>a.adp-b.adp);
+    let t=1;
+    tiers[list[0].id]=1;
+    for(let i=1;i<list.length;i++){
+      const gap=list[i].adp-list[i-1].adp;
+      const thresh=Math.max(5, list[i-1].adp*0.13);
+      if(gap>=thresh && t<12) t++;
+      tiers[list[i].id]=t;
+    }
+  }
+})();
+/* ---------- my roster assembly ---------- */
+function myRoster(){
+  const picks = S.actions.filter(a=>a.kind==='mine')
+    .map(a=>({...PLAYERS.find(p=>p.id===a.id), pickNo:a.pick}));
+  const slots = [];
+  for(const pos of ['QB','RB','WR','TE','FLEX','K','DST'])
+    for(let i=0;i<(S.req[pos]||0);i++) slots.push({lab:pos+(S.req[pos]>1?' '+(i+1):''), pos, pl:null});
+  for(let i=0;i<(S.req.BN||0);i++) slots.push({lab:'BN '+(i+1), pos:'BN', pl:null});
+  const flexOK = p=>['RB','WR','TE'].includes(p);
+  for(const pl of picks){
+    let s = slots.find(x=>!x.pl && x.pos===pl.p)
+         || (flexOK(pl.p) && slots.find(x=>!x.pl && x.pos==='FLEX'))
+         || slots.find(x=>!x.pl && x.pos==='BN');
+    if(s) s.pl=pl;
+  }
+  return {picks, slots};
+}
+function openStarters(){
+  const {slots} = myRoster(); const need={};
+  for(const s of slots) if(!s.pl && s.pos!=='BN') need[s.pos]=(need[s.pos]||0)+1;
+  return need;   // e.g. {RB:1, FLEX:1, K:1, DST:1}
+}
+/* ---------- recommendation engine ---------- */
+function scoreAvailable(){
+  const need = openStarters();
+  const {picks} = myRoster();
+  const myCount = {}; for(const p of picks) myCount[p.p]=(myCount[p.p]||0)+1;
+  const myPicksLeft = nextMyPicks(1e9).length;
+  const kdNeeded = (need.K||0)+(need.DST||0);
+  const nxt = nextMyPicks(2);
+  const afterThis = nxt.length>1 ? nxt[1] : totalPicks();
+  // recent positional run (last 12 picks)
+  const recent = S.actions.slice(-12); const runCount={};
+  for(const a of recent){ const pl=PLAYERS.find(p=>p.id===a.id); runCount[pl.p]=(runCount[pl.p]||0)+1; }
+  // tier remaining counts
+  const tierLeft = {};
+  for(const p of PLAYERS) if(!status[p.id]){
+    const key=p.p+'-'+tiers[p.id]; tierLeft[key]=(tierLeft[key]||0)+1; }
+  const myByes = {}; for(const p of picks) if(p.b) myByes[p.b]=(myByes[p.b]||0)+1;
+  const scored=[];
+  for(const p of PLAYERS){
+    if(status[p.id]) continue;
+    const reasons=[];
+    let base = Math.max(0, 320 - p.adp);
+    // need weight
+    let w;
+    if(need[p.p]) { w=1.0; reasons.push({t:`Starting ${p.p} open`, c:'good'}); }
+    else if(need.FLEX && ['RB','WR','TE'].includes(p.p)) { w=0.88; reasons.push({t:'Fills FLEX', c:'good'}); }
+    else if(p.p==='QB'||p.p==='TE') { w=(myCount[p.p]>=2)?0.12:0.3; }
+    else if(p.p==='K'||p.p==='DST') { w=0.02; }
+    else { w = (myCount[p.p]||0) <= 3 ? 0.62 : 0.42; reasons.push({t:'Bench depth', c:''}); }
+    // K/DST end-game logic
+    if(p.p==='K'||p.p==='DST'){
+      if(kdNeeded>0 && myPicksLeft<=kdNeeded+1){ w=1.5; reasons.push({t:'Time to fill '+p.p, c:'urgent'}); }
+      else if(kdNeeded===0){ w=0.01; }
+    }
+    let score = base*w;
+    // ADP value
+    if(p.adp < S.pick - 3){
+      const v=Math.min(25,(S.pick-p.adp)*0.6); score+=v;
+      reasons.push({t:`Value — ADP ${p.adp}, now pick ${S.pick}`, c:'good'});
+    }
+    // tier cliff
+    const left = tierLeft[p.p+'-'+tiers[p.id]];
+    if(left<=2 && tiers[p.id]<=7 && ['RB','WR','TE','QB'].includes(p.p)){
+      score+=16; reasons.push({t:`Tier ${tiers[p.id]} ${p.p} — ${left} left`, c:'urgent'});
+    }
+    // positional run
+    if((runCount[p.p]||0)>=4 && ['RB','WR'].includes(p.p)){
+      score+=8; reasons.push({t:`${p.p} run (${runCount[p.p]} of last 12)`, c:'urgent'});
+    }
+    // won't make it back
+    if(p.adp <= afterThis && S.pick < totalPicks()-S.teams){
+      reasons.push({t:`Likely gone before your next pick (#${afterThis})`, c:'gone'});
+    }
+    // user's queue
+    if(inQueue(p.id)){ score+=6; reasons.unshift({t:'★ In your queue', c:'good'}); }
+    // bye stacking (soft)
+    if(p.b && (myByes[p.b]||0)>=3){ score-=5; reasons.push({t:`Bye ${p.b} pile-up`, c:''}); }
+    scored.push({p, score, reasons});
+  }
+  scored.sort((a,b)=>b.score-a.score);
+  return scored;
+}
+function recommend(n=5){ return scoreAvailable().slice(0,n); }
+/* ---------- rendering ---------- */
+function fillSelect(sel, from, to, cur){ sel.innerHTML='';
+  for(let i=from;i<=to;i++){ const o=document.createElement('option'); o.value=i; o.textContent=i;
+    if(i===cur)o.selected=true; sel.appendChild(o);} }
+function reqEditor(container, req){
+  container.innerHTML='';
+  for(const k of ['QB','RB','WR','TE','FLEX','K','DST','BN']){
+    const d=document.createElement('div'); d.className='reqitem';
+    d.innerHTML=`<div class="lab">${k}</div><div class="stepper">
+      <button data-k="${k}" data-d="-1">−</button><span class="num" id="req-${container.id}-${k}">${req[k]}</span>
+      <button data-k="${k}" data-d="1">+</button></div>`;
+    container.appendChild(d);
+  }
+  container.onclick=e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    const k=b.dataset.k; req[k]=Math.max(0, Math.min(9, req[k]+Number(b.dataset.d)));
+    $(`req-${container.id}-${k}`).textContent=req[k];
+  };
+}
+function renderStatus(){
+  const done = S.pick > totalPicks();
+  $('stRound').textContent = done ? '✓' : roundOf(S.pick);
+  $('stPick').textContent = done ? 'End' : `${S.pick}`;
+  const mine = !done && teamOnClock(S.pick)===S.slot;
+  $('stClockBox').classList.toggle('onclock', mine);
+  $('stClock').textContent = done ? '—' : (mine ? 'YOU' : 'Team '+teamOnClock(S.pick));
+  $('stClockLab').textContent = mine ? 'Your pick!' : 'On the clock';
+  const nxt = nextMyPicks(1);
+  $('stNext').textContent = nxt.length? '#'+nxt[0] : '—';
+  $('subhdr').textContent = `${S.teams}-team PPR snake · slot ${S.slot} · Rd ${Math.min(roundOf(Math.min(S.pick,totalPicks())),S.rounds)}/${S.rounds}`;
+}
+function playerRow(p, compact){
+  const st = status[p.id];
+  const row=document.createElement('div');
+  row.className='row'+(st==='taken'?' gone':'')+(st==='mine'?' mine':'')
+    +(S.ui.cmp.includes(p.id)?' cmpsel':'');
+  const bye = p.b ? `Bye ${p.b}` : 'FA';
+  row.innerHTML=`<div class="rnk">${p.id}</div>
+    <div class="pinfo">
+      <div class="pname">${p.n}${inQueue(p.id)?' <span style="color:#f2cc60">★</span>':''}</div>
+      <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${p.t} · ${bye} · ADP ${p.adp} · <span class="tierb">Tier ${tiers[p.id]}</span></div>
+    </div>`;
+  row.querySelector('.pinfo').onclick=()=>{
+    if(S.ui.cmpActive) toggleCompare(p.id); else openPlayer(p.id); };
+  if(!st){
+    row.appendChild(starButton(p.id));
+    const b1=document.createElement('button'); b1.className='btn taken'; b1.textContent='Taken';
+    b1.onclick=()=>mark(p.id,'taken');
+    const b2=document.createElement('button'); b2.className='btn mine'; b2.textContent='Me';
+    b2.onclick=()=>mark(p.id,'mine');
+    row.appendChild(b1); row.appendChild(b2);
+  } else {
+    const tag=document.createElement('div'); tag.style.cssText='font-size:11px;font-weight:800;color:'+(st==='mine'?'var(--me)':'var(--bad)');
+    const a=S.actions.find(x=>x.id===p.id);
+    tag.textContent=(st==='mine'?'MINE':'GONE')+(a?` #${a.pick}`:'');
+    row.appendChild(tag);
+  }
+  return row;
+}
+function renderRecs(){
+  const el=$('recs'); el.innerHTML='';
+  const mine = S.pick<=totalPicks() && teamOnClock(S.pick)===S.slot;
+  $('recHdr').textContent = mine ? '🎯 Your pick — best options' : 'Best available (planning ahead)';
+  const recs=recommend(5);
+  recs.forEach((r,i)=>{
+    const d=document.createElement('div'); d.className='rec'+(i===0?' top':'');
+    const bye=r.p.b?`Bye ${r.p.b}`:'FA';
+    d.innerHTML=`<div class="recrank">${i+1}</div>
+      <div class="recmain">
+        <div class="recname">${r.p.n}${inQueue(r.p.id)?' <span style="color:#f2cc60">★</span>':''}</div>
+        <div class="recmeta"><span class="posbadge ${posColor(r.p.p)}">${r.p.p}${r.p.pr}</span>${r.p.t} · ${bye} · ADP ${r.p.adp} · Tier ${tiers[r.p.id]}</div>
+        <div class="reasons">${r.reasons.slice(0,3).map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('')}</div>
+      </div>`;
+    d.querySelector('.recmain').onclick=()=>openPlayer(r.p.id);
+    d.appendChild(starButton(r.p.id));
+    const b1=document.createElement('button'); b1.className='btn taken'; b1.textContent='Taken';
+    b1.onclick=()=>mark(r.p.id,'taken');
+    const b2=document.createElement('button'); b2.className='btn mine'; b2.textContent='Me';
+    b2.onclick=()=>mark(r.p.id,'mine');
+    d.appendChild(b1); d.appendChild(b2);
+    el.appendChild(d);
+  });
+}
+function renderBoard(){
+  const el=$('board'); el.innerHTML='';
+  const q=S.ui.search.toLowerCase();
+  let list=PLAYERS.filter(p=>{
+    if(S.ui.hideDrafted && status[p.id]) return false;
+    if(S.ui.pos==='ALL'){}
+    else if(S.ui.pos==='FLEX'){ if(!['RB','WR','TE'].includes(p.p)) return false; }
+    else if(p.p!==S.ui.pos) return false;
+    if(q && !(p.n.toLowerCase().includes(q)||p.t.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const shown=list.slice(0,S.ui.shown);
+  for(const p of shown) el.appendChild(playerRow(p));
+  $('showMore').style.display = list.length>S.ui.shown ? 'block':'none';
+}
+function renderQueue(){
+  const el=$('queueList'); el.innerHTML='';
+  if(!S.queue.length){
+    el.innerHTML='<div class="note" style="text-align:center;padding:24px 10px">Your queue is empty.<br>Star players from the Draft tab while you wait for your turn.</div>';
+    $('clearGone').style.display='none'; return;
+  }
+  let nextFound=false, anyGone=false;
+  S.queue.forEach((id,i)=>{
+    const p=PLAYERS.find(x=>x.id===id);
+    const st=status[id];
+    const isNext = !st && !nextFound; if(isNext) nextFound=true;
+    if(st) anyGone=true;
+    const d=document.createElement('div');
+    d.className='qrow'+(isNext?' next':'')+(st?' gonerow':'');
+    d.innerHTML=`<div class="qord">
+        <button data-d="-1" ${i===0?'disabled':''}>▲</button>
+        <button data-d="1" ${i===S.queue.length-1?'disabled':''}>▼</button></div>
+      <div class="rnk">${i+1}</div>
+      <div class="pinfo">
+        <div class="pname">${p.n}${isNext?' <span style="color:#f2cc60;font-size:11px;font-weight:800">NEXT UP</span>':''}</div>
+        <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${p.t} · ${p.b?'Bye '+p.b:'FA'} · ADP ${p.adp} · Tier ${tiers[p.id]}${st?(st==='mine'?' · <b style="color:var(--me)">MINE</b>':' · <b style="color:var(--bad)">GONE</b>'):''}</div>
+      </div>`;
+    d.querySelector('.pinfo').onclick=()=>openPlayer(id);
+    d.querySelector('.qord').onclick=e=>{
+      const b=e.target.closest('button'); if(!b||b.disabled)return;
+      const j=i+Number(b.dataset.d);
+      [S.queue[i],S.queue[j]]=[S.queue[j],S.queue[i]]; renderQueue();
+    };
+    if(!st){
+      const b1=document.createElement('button'); b1.className='btn taken'; b1.textContent='Taken';
+      b1.onclick=()=>mark(id,'taken');
+      const b2=document.createElement('button'); b2.className='btn mine'; b2.textContent='Me';
+      b2.onclick=()=>mark(id,'mine');
+      d.appendChild(b1); d.appendChild(b2);
+    }
+    const x=document.createElement('button'); x.className='qx'; x.textContent='✕';
+    x.onclick=()=>{ S.queue.splice(i,1); renderAll(); };
+    d.appendChild(x);
+    el.appendChild(d);
+  });
+  $('clearGone').style.display = anyGone ? 'block':'none';
+}
+$('clearGone').onclick=()=>{ S.queue=S.queue.filter(id=>!status[id]); renderAll(); };
+function openPlayer(id){
+  const p=PLAYERS.find(x=>x.id===id);
+  const st=status[id]; const s=STATS[String(id)];
+  const sheet=$('pSheet');
+  const bye=p.b?`Bye ${p.b}`:'Free agent';
+  let statsHtml;
+  if(s){
+    const fppg=(s.fp/s.g).toFixed(1);
+    statsHtml=`<h2 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:16px 2px 6px">2025 season (PPR)</h2>
+      <div class="pd-facts" style="margin:8px 0 0">
+        <div class="fact"><div class="v">${s.fp.toFixed(1)}</div><div class="l">Fantasy pts</div></div>
+        <div class="fact"><div class="v">${fppg}</div><div class="l">Pts / game</div></div>
+        <div class="fact"><div class="v">${s.g}</div><div class="l">Games</div></div>
+        <div class="fact"><div class="v">${p.p==='DST'?'—':(s.g<12?'⚠':'✓')}</div><div class="l">${p.p==='DST'?'':(s.g<12?'Missed time':'Full-ish yr')}</div></div>
+      </div>
+      <div class="pd-stats">${s.rows.map(r=>`<div class="fact"><div class="v">${r[1]}</div><div class="l">${r[0]}</div></div>`).join('')}</div>`;
+  } else {
+    statsHtml=`<div class="pd-none">No 2025 NFL stats — rookie (2026 draft class) or missed last season.</div>`;
+  }
+  sheet.innerHTML=`<div class="pd-head">
+      <div style="flex:1">
+        <div class="pd-name">${p.n}</div>
+        <div class="pd-sub"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${p.t} · ${bye}</div>
+      </div>
+      <button class="iconbtn" id="pdClose">✕</button>
+    </div>
+    <div class="pd-facts">
+      <div class="fact"><div class="v">#${p.id}</div><div class="l">Rank</div></div>
+      <div class="fact"><div class="v">${p.adp}</div><div class="l">ADP</div></div>
+      <div class="fact"><div class="v">${tiers[p.id]}</div><div class="l">Tier</div></div>
+      <div class="fact"><div class="v">${p.b||'—'}</div><div class="l">Bye</div></div>
+    </div>
+    ${statsHtml}
+    <div class="sheetbtns" id="pdBtns"></div>`;
+  $('pdClose').onclick=()=>$('pModal').classList.remove('open');
+  const btns=$('pdBtns');
+  if(!st){
+    const bs=starButton(id); bs.style.cssText='width:46px;height:auto;font-size:18px;';
+    bs.onclick=()=>{ toggleStar(id); $('pModal').classList.remove('open'); };
+    const bc=document.createElement('button'); bc.className='btn ghost'; bc.style.cssText='width:46px;font-size:16px;padding:9px 0;';
+    bc.textContent='⚖';
+    bc.onclick=()=>{ toggleCompare(id); $('pModal').classList.remove('open');
+      const p=PLAYERS.find(x=>x.id===id);
+      if(S.ui.cmp.includes(id)) toast(`${p.n} added to compare (${S.ui.cmp.length})`); };
+    const b1=document.createElement('button'); b1.className='btn taken'; b1.style.flex='1'; b1.textContent='Taken';
+    b1.onclick=()=>{ $('pModal').classList.remove('open'); mark(id,'taken'); };
+    const b2=document.createElement('button'); b2.className='btn mine'; b2.style.flex='1'; b2.textContent='Draft to my team';
+    b2.onclick=()=>{ $('pModal').classList.remove('open'); mark(id,'mine'); };
+    btns.appendChild(bs); btns.appendChild(bc); btns.appendChild(b1); btns.appendChild(b2);
+  } else {
+    const a=S.actions.find(x=>x.id===id);
+    btns.innerHTML=`<div class="note" style="flex:1;text-align:center">${st==='mine'?'On your roster':'Drafted by Team '+teamOnClock(a.pick)} — pick #${a.pick}</div>`;
+  }
+  $('pModal').classList.add('open');
+}
+$('pModal').onclick=e=>{ if(e.target===$('pModal')) $('pModal').classList.remove('open'); };
+/* ---------- compare ---------- */
+function toggleCompare(id){
+  const c=S.ui.cmp, i=c.indexOf(id);
+  if(i>=0) c.splice(i,1);
+  else{
+    if(c.length>=4){ toast('Compare up to 4 players'); return; }
+    c.push(id);
+  }
+  renderCmpBar();
+  if(S.ui.tab==='draft') renderBoard();
+}
+function renderCmpBar(){
+  const c=S.ui.cmp;
+  $('cmpBar').classList.toggle('show', c.length>0);
+  $('cmpNames').innerHTML = c.map(id=>PLAYERS.find(p=>p.id===id).n.split(' ').slice(-1)[0]).join(' <span style="color:var(--dim)">vs</span> ');
+  $('cmpOpen').disabled = c.length<2;
+  $('cmpOpen').style.opacity = c.length<2?'.5':'1';
+}
+function compact2025(id){
+  const s=STATS[String(id)];
+  if(!s) return null;
+  return s.rows.map(r=>`${r[1]} ${r[0].toLowerCase()}`).join(' · ');
+}
+function openCompare(){
+  const ids=S.ui.cmp; if(ids.length<2) return;
+  const ps=ids.map(id=>PLAYERS.find(p=>p.id===id));
+  const scores=scoreAvailable();
+  const info=ps.map(p=>{
+    const sc=scores.find(x=>x.p.id===p.id);
+    const st=status[p.id];
+    const s=STATS[String(p.id)];
+    return {p, st, s, score:sc?sc.score:null, reasons:sc?sc.reasons:[],
+      ppg: s? s.fp/s.g : null};
+  });
+  const n=ids.length;
+  const grid=(cells)=>`<div class="cmp-grid" style="grid-template-columns:78px repeat(${n},1fr)">${cells}</div>`;
+  const bestIdx=(vals,dir)=>{ // dir 1: higher best, -1: lower best
+    let bi=-1,bv=null;
+    vals.forEach((v,i)=>{ if(v==null)return;
+      if(bv==null || (dir>0? v>bv : v<bv)){ bv=v; bi=i; } });
+    return vals.filter(v=>v!=null).length>1 ? bi : -1;
+  };
+  const rowH=(lab,vals,dir,subs)=>{
+    const bi = dir? bestIdx(vals.map(v=>typeof v==='number'?v:null),dir) : -1;
+    return `<div class="cmp-cell lab">${lab}</div>`+vals.map((v,i)=>
+      `<div class="cmp-cell${i===bi?' best':''}">${v==null?'—':(typeof v==='number'? (Number.isInteger(v)?v:v.toFixed(1)) : v)}${subs&&subs[i]?`<span class="sub">${subs[i]}</span>`:''}</div>`).join('');
+  };
+  const {picks}=myRoster();
+  const myByes={}; for(const p of picks) if(p.b) myByes[p.b]=(myByes[p.b]||0)+1;
+  let html='';
+  html+=grid(
+    `<div class="cmp-cell lab"></div>`+info.map(x=>
+      `<div class="cmp-cell head">${x.p.n}<span class="sub"><span class="posbadge ${posColor(x.p.p)}">${x.p.p}${x.p.pr}</span>${x.p.t}${x.st?(x.st==='mine'?' · MINE':' · GONE'):''}</span></div>`).join('')
+    +rowH('Consensus', info.map(x=>x.p.id), -1)
+    +rowH('ADP', info.map(x=>x.p.adp), -1)
+    +rowH('Tier', info.map(x=>tiers[x.p.id]), -1)
+    +rowH('Bye', info.map(x=>x.p.b||null), 0, info.map(x=>x.p.b&&myByes[x.p.b]?`⚠ ${myByes[x.p.b]} of yours`:''))
+    +rowH('2025 pts', info.map(x=>x.s?x.s.fp:null), 1)
+    +rowH('Pts/game', info.map(x=>x.ppg), 1)
+    +rowH('Games', info.map(x=>x.s?x.s.g:null), 0, info.map(x=>x.s&&x.s.g<12?'missed time':''))
+    +rowH('Draft fit', info.map(x=>x.score!=null?Math.round(x.score):null), 1, info.map(x=>x.st?'drafted':''))
+  );
+  // 2025 stat lines
+  html+='<div style="margin-top:10px">'+info.map(x=>{
+    const line=compact2025(x.p.id);
+    return `<div class="note" style="margin-top:6px"><b style="color:var(--text)">${x.p.n.split(' ').slice(-1)[0]} '25:</b> ${line||'no NFL stats (rookie or missed season)'}</div>`;
+  }).join('')+'</div>';
+  // verdict
+  const avail=info.filter(x=>!x.st && x.score!=null);
+  if(avail.length>=2){
+    const sorted=[...avail].sort((a,b)=>b.score-a.score);
+    const [a,b]=sorted;
+    const margin=a.score-b.score;
+    const close=margin<12;
+    const why=a.reasons.slice(0,2).map(r=>r.t).join('; ')||'stronger overall value';
+    html+=`<div class="verdict${close?' tie':''}">`+(close
+      ? `⚖ <b>Coin flip</b> — slight edge to <b>${a.p.n}</b> (${why}). Worth asking Claude below.`
+      : `✅ The app leans <b>${a.p.n}</b> — ${why}.`)
+      +(info.some(x=>x.st)?` <span style="color:var(--dim)">(drafted players excluded from verdict)</span>`:'')
+      +`</div>`;
+  } else if(avail.length===1){
+    html+=`<div class="verdict">✅ <b>${avail[0].p.n}</b> is the only one still available.</div>`;
+  } else {
+    html+=`<div class="verdict tie">All of these players are already drafted.</div>`;
+  }
+  $('cBody').innerHTML=html;
+  $('cModal').classList.add('open');
+}
+function buildCompareText(){
+  const ids=S.ui.cmp;
+  const {picks}=myRoster(); const need=openStarters();
+  const nxt=nextMyPicks(3);
+  const scores=scoreAvailable();
+  const lines=[];
+  lines.push('PLAYER COMPARISON — help me pick one');
+  lines.push(`League: ${S.teams}-team PPR snake, slot ${S.slot}. Current overall pick ${S.pick}; my upcoming picks: ${nxt.map(x=>'#'+x).join(', ')||'none'}.`);
+  lines.push(`My roster: ${picks.length?picks.map(p=>`${p.n} (${p.p}${p.pr}, bye ${p.b||'—'})`).join(', '):'(empty)'}`);
+  lines.push(`Open starting slots: ${Object.keys(need).length?Object.entries(need).map(([k,v])=>`${k}×${v}`).join(', '):'none'}`);
+  lines.push('');
+  lines.push('CANDIDATES:');
+  ids.forEach((id,i)=>{
+    const p=PLAYERS.find(x=>x.id===id);
+    const st=status[id]; const s=STATS[String(id)];
+    const sc=scores.find(x=>x.p.id===id);
+    lines.push(`${i+1}. ${p.n} — ${p.p}${p.pr}, ${p.t}, bye ${p.b||'—'} · consensus #${p.id}, ADP ${p.adp}, Tier ${tiers[p.id]}${st?` · ALREADY DRAFTED (${st})`:''}`);
+    lines.push(`   2025: ${s?`${s.g} games, ${s.fp.toFixed(1)} PPR pts (${(s.fp/s.g).toFixed(1)}/g) — ${compact2025(id)}`:'no NFL stats (rookie or missed season)'}`);
+    if(sc && sc.reasons.length) lines.push(`   App notes: ${sc.reasons.slice(0,3).map(r=>r.t).join('; ')}`);
+  });
+  lines.push('');
+  lines.push('QUESTION: Which of these should I draft and why? Consider my roster construction, tier/positional scarcity, injury risk from 2025 games missed, bye overlap with my roster, and whether the others might still be available at my next pick.');
+  return lines.join('\n');
+}
+function renderTeam(){
+  const {slots,picks}=myRoster();
+  const el=$('roster'); el.innerHTML='';
+  for(const s of slots){
+    const d=document.createElement('div'); d.className='slotrow';
+    d.innerHTML=`<div class="slotlab">${s.lab}</div>`+
+      (s.pl ? `<div><b>${s.pl.n}</b> <span style="color:var(--dim);font-size:12px">· ${s.pl.p}${s.pl.pr} ${s.pl.t} · Bye ${s.pl.b||'—'} · pick #${s.pl.pickNo}</span></div>`
+            : `<div class="empty">— open —</div>`);
+    el.appendChild(d);
+  }
+  const byes={}; for(const p of picks) if(p.b) byes[p.b]=(byes[p.b]||0)+1;
+  const bad=Object.entries(byes).filter(([w,c])=>c>=3);
+  $('byeWarn').textContent = bad.length? '⚠ Bye week pile-up: '+bad.map(([w,c])=>`week ${w} (${c} players)`).join(', ') : '';
+  const need=openStarters();
+  $('needs').textContent = Object.keys(need).length
+    ? 'Still need starters: '+Object.entries(need).map(([k,v])=>`${k}×${v}`).join(', ')
+    : 'All starting slots filled — building bench depth now.';
+}
+function renderLog(){
+  const el=$('log'); el.innerHTML='';
+  [...S.actions].reverse().forEach(a=>{
+    const p=PLAYERS.find(x=>x.id===a.id);
+    const d=document.createElement('div'); d.className='logrow';
+    d.innerHTML=`<div class="logpick">#${a.pick} R${roundOf(a.pick)}</div>
+      <span class="posbadge ${posColor(p.p)}">${p.p}</span>
+      <div style="flex:1">${p.n} <span style="color:var(--dim);font-size:12px">${p.t}</span></div>
+      <div style="font-size:11px;font-weight:800;color:${a.kind==='mine'?'var(--me)':'var(--dim)'}">${a.kind==='mine'?'YOU':'Team '+teamOnClock(a.pick)}</div>`;
+    el.appendChild(d);
+  });
+  if(!S.actions.length) el.innerHTML='<div class="note">No picks yet.</div>';
+}
+function renderAll(){
+  renderStatus();
+  const t=S.ui.tab;
+  $('draftView').style.display = t==='draft'?'block':'none';
+  $('queueView').style.display = t==='queue'?'block':'none';
+  $('teamView').style.display = t==='team'?'block':'none';
+  $('logView').style.display = t==='log'?'block':'none';
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  const avail=S.queue.filter(id=>!status[id]).length;
+  $('qCount').style.display = avail? 'inline-block':'none';
+  $('qCount').textContent = avail;
+  if(t==='draft'){ renderRecs(); renderBoard(); }
+  if(t==='queue') renderQueue();
+  if(t==='team') renderTeam();
+  if(t==='log') renderLog();
+}
+/* ---------- actions ---------- */
+function mark(id, kind){
+  if(status[id]) return;
+  if(S.pick>totalPicks()){ toast('Draft is complete'); return; }
+  S.actions.push({id, kind, pick:S.pick});
+  S.pick++;
+  rebuildStatus();
+  const p=PLAYERS.find(x=>x.id===id);
+  toast(kind==='mine' ? `You drafted ${p.n}!` : `${p.n} — gone`);
+  renderAll();
+}
+$('undoBtn').onclick=()=>{
+  const a=S.actions.pop();
+  if(!a){ toast('Nothing to undo'); return; }
+  S.pick=a.pick; rebuildStatus(); toast('Undone'); renderAll();
+};
+/* ---------- copy state for Claude ---------- */
+function buildClaudeText(){
+  const {picks}=myRoster();
+  const need=openStarters();
+  const nxt=nextMyPicks(4);
+  const avail=recommend(30);
+  const recent=S.actions.slice(-12).map(a=>{
+    const p=PLAYERS.find(x=>x.id===a.id);
+    return `#${a.pick} ${p.n} (${p.p}${p.pr})${a.kind==='mine'?' *ME*':''}`; });
+  const lines=[];
+  lines.push(`FANTASY DRAFT — LIVE STATE`);
+  lines.push(`League: ${S.teams}-team PPR snake, ${S.rounds} rounds. I draft from slot ${S.slot}.`);
+  lines.push(`Lineup: ${['QB','RB','WR','TE','FLEX','K','DST','BN'].map(k=>`${k}:${S.req[k]}`).join(' ')}`);
+  lines.push(`Current overall pick: ${S.pick} (Round ${Math.min(roundOf(Math.min(S.pick,totalPicks())),S.rounds)}). ${teamOnClock(Math.min(S.pick,totalPicks()))===S.slot&&S.pick<=totalPicks()?'IT IS MY PICK NOW.':''}`);
+  lines.push(`My upcoming picks: ${nxt.length?nxt.map(x=>'#'+x).join(', '):'none left'}`);
+  lines.push(``);
+  lines.push(`MY ROSTER SO FAR:`);
+  lines.push(picks.length? picks.map(p=>`- ${p.n} (${p.p}${p.pr}, ${p.t}, bye ${p.b||'—'}) — pick #${p.pickNo}`).join('\n') : '- (empty)');
+  lines.push(`Open starting slots: ${Object.keys(need).length?Object.entries(need).map(([k,v])=>`${k}×${v}`).join(', '):'none — bench from here'}`);
+  const q=S.queue.filter(id=>!status[id]).map(id=>{const p=PLAYERS.find(x=>x.id===id);return `${p.n} (${p.p}${p.pr})`;});
+  lines.push(`MY QUEUE (my own priority order): ${q.length?q.join(', '):'(empty)'}`);
+  lines.push(``);
+  lines.push(`TOP 30 AVAILABLE (my app's rank order · consensus rank, pos, team, bye, ADP, tier):`);
+  avail.forEach((r,i)=>lines.push(`${i+1}. ${r.p.n} — #${r.p.id} ${r.p.p}${r.p.pr} ${r.p.t} bye ${r.p.b||'—'} ADP ${r.p.adp} T${tiers[r.p.id]}`));
+  lines.push(``);
+  lines.push(`LAST 12 PICKS: ${recent.join(' · ')||'none'}`);
+  lines.push(``);
+  lines.push(`QUESTION: Who should I target with my next pick and why? Consider tiers, positional scarcity, my roster needs, bye overlap, and who is likely to still be there at my following pick.`);
+  return lines.join('\n');
+}
+/* ---------- save / load ---------- */
+function openExport(mode){
+  const m=$('exModal'); m.classList.add('open');
+  if(mode==='claude'){
+    $('exTitle').textContent='Ask Claude — draft state';
+    $('exNote').innerHTML='Paste this into your Claude chat for deep analysis of your next pick.';
+    $('exText').value=buildClaudeText(); $('exLoad').style.display='none';
+  } else if(mode==='cmp'){
+    $('exTitle').textContent='Ask Claude — player matchup';
+    $('exNote').innerHTML='Paste this into your Claude chat and I\'ll break down which player to take.';
+    $('exText').value=buildCompareText(); $('exLoad').style.display='none';
+  } else {
+    $('exTitle').textContent='Save / load draft';
+    $('exNote').innerHTML='<b>Save:</b> copy this code somewhere safe (notes app). <b>Load:</b> paste a saved code below and tap “Load pasted state”. <span style="color:var(--warn)">Note: refreshing the page clears the draft — save first!</span>';
+    $('exText').value=JSON.stringify({v:2, S:{...S, ui:undefined}});
+    $('exLoad').style.display='block';
+  }
+}
+$('askClaude').onclick=()=>openExport('claude');
+$('saveBtn').onclick=()=>openExport('save');
+$('exClose').onclick=()=>$('exModal').classList.remove('open');
+$('exCopy').onclick=async()=>{
+  const t=$('exText');
+  try{ await navigator.clipboard.writeText(t.value); toast('Copied!'); }
+  catch(e){ t.focus(); t.select(); try{document.execCommand('copy'); toast('Copied!');}catch(e2){ toast('Select & copy manually'); } }
+};
+$('exLoad').onclick=()=>{
+  try{
+    const data=JSON.parse($('exText').value);
+    if(!data.S || !Array.isArray(data.S.actions)) throw 0;
+    S={...S, ...data.S, queue:data.S.queue||[], ui:S.ui, started:true};
+    rebuildStatus(); showApp(); renderAll();
+    $('exModal').classList.remove('open'); toast('Draft restored');
+  }catch(e){ toast('Could not read that save code'); }
+};
+/* ---------- compare wiring ---------- */
+$('cmpMode').onclick=()=>{
+  S.ui.cmpActive=!S.ui.cmpActive;
+  $('cmpMode').classList.toggle('active', S.ui.cmpActive);
+  toast(S.ui.cmpActive?'Compare mode: tap players to select':'Compare mode off');
+};
+$('cmpClear').onclick=()=>{ S.ui.cmp=[]; renderCmpBar(); if(S.ui.tab==='draft') renderBoard(); };
+$('cmpOpen').onclick=()=>openCompare();
+$('cClose').onclick=()=>$('cModal').classList.remove('open');
+$('cModal').onclick=e=>{ if(e.target===$('cModal')) $('cModal').classList.remove('open'); };
+$('cAsk').onclick=()=>{ $('cModal').classList.remove('open'); openExport('cmp'); };
+/* ---------- settings ---------- */
+$('setBtn').onclick=()=>{
+  if(!S.started){ toast('Finish setup first'); return; }
+  fillSelect($('mTeams'),4,20,S.teams); fillSelect($('mSlot'),1,S.teams,S.slot);
+  fillSelect($('mRounds'),8,25,S.rounds); $('mPick').value=S.pick;
+  window._mreq={...S.req}; reqEditor($('mReq'), window._mreq);
+  $('mTeams').onchange=()=>fillSelect($('mSlot'),1,Number($('mTeams').value),Math.min(S.slot,Number($('mTeams').value)));
+  $('setModal').classList.add('open');
+};
+$('mCancel').onclick=()=>$('setModal').classList.remove('open');
+$('mSave').onclick=()=>{
+  S.teams=Number($('mTeams').value); S.slot=Number($('mSlot').value);
+  S.rounds=Number($('mRounds').value); S.req={...window._mreq};
+  S.pick=Math.max(1,Math.min(totalPicks()+1,Number($('mPick').value)||1));
+  $('setModal').classList.remove('open'); renderAll(); toast('Settings saved');
+};
+$('mReset').onclick=()=>{
+  if(!confirm('Reset the whole draft? All picks will be cleared.')) return;
+  S.actions=[]; S.pick=1; rebuildStatus();
+  $('setModal').classList.remove('open'); renderAll(); toast('Draft reset');
+};
+$('stPick').onclick=()=>{
+  const v=prompt('Set current overall pick number (use this if the app got out of sync with the real draft):', S.pick);
+  if(v==null) return; const n=Number(v);
+  if(n>=1 && n<=totalPicks()+1){ S.pick=Math.round(n); renderAll(); } else toast('Invalid pick number');
+};
+/* ---------- ui wiring ---------- */
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ S.ui.tab=b.dataset.tab; renderAll(); });
+$('search').oninput=e=>{ S.ui.search=e.target.value; S.ui.shown=50; renderBoard(); };
+$('toggleDrafted').onclick=()=>{ S.ui.hideDrafted=!S.ui.hideDrafted;
+  $('toggleDrafted').textContent=S.ui.hideDrafted?'Hide drafted':'Show all'; renderBoard(); };
+$('showMore').onclick=()=>{ S.ui.shown+=50; renderBoard(); };
+(function(){
+  const el=$('pfilters');
+  for(const pos of ['ALL','RB','WR','QB','TE','FLEX','K','DST']){
+    const b=document.createElement('button'); b.className='pf'+(pos==='ALL'?' active':''); b.textContent=pos;
+    b.onclick=()=>{ S.ui.pos=pos; S.ui.shown=50;
+      el.querySelectorAll('.pf').forEach(x=>x.classList.toggle('active',x===b)); renderBoard(); };
+    el.appendChild(b);
+  }
+})();
+/* ---------- setup screen ---------- */
+fillSelect($('suTeams'),4,20,10); fillSelect($('suSlot'),1,10,5); fillSelect($('suRounds'),8,25,15);
+$('suTeams').onchange=()=>fillSelect($('suSlot'),1,Number($('suTeams').value),1);
+window._sureq={...DEF_REQ}; reqEditor($('suReq'), window._sureq);
+$('suStart').onclick=()=>{
+  S.teams=Number($('suTeams').value); S.slot=Number($('suSlot').value);
+  S.rounds=Number($('suRounds').value); S.req={...window._sureq};
+  S.started=true; S.pick=1;
+  showApp(); renderAll(); toast('Draft on — good luck! 🍀');
+};
+function showApp(){
+  $('setupView').style.display='none';
+  $('statusbar').style.display='flex'; $('tabs').style.display='flex'; $('bottombar').style.display='block';
+}
+</script>
+</body>
+</html>
