@@ -628,6 +628,9 @@ function renderAll(){
   $('queueView').style.display = t==='queue'?'block':'none';
   $('teamView').style.display = t==='team'?'block':'none';
   $('logView').style.display = t==='log'?'block':'none';
+  $('buddyView').style.display = t==='buddy'?'block':'none';
+  $('bottombar').style.display = (S.started && t!=='buddy') ? 'block':'none';
+  $('chatbar').style.display = (S.started && t==='buddy') ? 'block':'none';
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   const avail=S.queue.filter(id=>!status[id]).length;
   $('qCount').style.display = avail? 'inline-block':'none';
@@ -637,6 +640,7 @@ function renderAll(){
   if(t==='queue') renderQueue();
   if(t==='team') renderTeam();
   if(t==='log') renderLog();
+  if(t==='buddy') renderChat();
 }
 /* ---------- actions ---------- */
 function mark(id, kind){
@@ -684,6 +688,75 @@ function buildClaudeText(){
   lines.push(`QUESTION: Who should I target with my next pick and why? Consider tiers, positional scarcity, my roster needs, bye overlap, and who is likely to still be there at my following pick.`);
   return lines.join('\n');
 }
+/* ---------- draft buddy chat ---------- */
+let chatHistory=[]; // [{role:'user'|'assistant', content:'...'}]
+let chatBusy=false;
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function renderChat(){
+  const el=$('chatMessages');
+  if(!chatHistory.length){
+    el.innerHTML=`<div class="empty-state">
+        <div class="empty-icon">🏈</div>
+        <div class="empty-title">Ask Buddy anything</div>
+        <div class="empty-sub">"Who should I target next?" · "RB or WR here?" · "Am I too heavy at one position?"</div>
+      </div>`;
+    return;
+  }
+  el.innerHTML=chatHistory.map(m=>{
+    const pending=m.role==='assistant' && !m.content && !m.errored;
+    const cls=m.role+(m.errored?' error':'');
+    const body=pending ? '<span class="chat-typing">●●●</span>' : escapeHtml(m.content).replace(/\n/g,'<br>');
+    return `<div class="chat-msg ${cls}">${body}</div>`;
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+}
+async function sendChat(){
+  const input=$('chatInput');
+  const text=input.value.trim();
+  if(!text||chatBusy) return;
+  input.value='';
+  chatHistory.push({role:'user', content:text});
+  const replyIdx=chatHistory.push({role:'assistant', content:''})-1;
+  renderChat();
+  chatBusy=true; $('chatSend').disabled=true;
+  try{
+    const draftState = S.started ? buildClaudeText() : 'The draft has not started yet — only the consensus player pool is available.';
+    const res=await fetch('/api/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        messages: chatHistory.slice(0,-1).map(m=>({role:m.role, content:m.content})),
+        draftState,
+      }),
+    });
+    if(!res.ok || !res.body){
+      let msg='Buddy is unavailable right now.';
+      try{ const errBody=await res.json(); if(errBody && errBody.message) msg=errBody.message; }catch(e){}
+      throw new Error(msg);
+    }
+    const reader=res.body.getReader();
+    const decoder=new TextDecoder();
+    let acc='';
+    while(true){
+      const {done, value}=await reader.read();
+      if(done) break;
+      acc+=decoder.decode(value, {stream:true});
+      chatHistory[replyIdx].content=acc;
+      renderChat();
+    }
+    if(!acc) chatHistory[replyIdx].content='(Buddy had nothing to say — try rephrasing.)';
+  }catch(e){
+    chatHistory[replyIdx].content=`⚠ ${e.message||'Something went wrong reaching Buddy.'}`;
+    chatHistory[replyIdx].errored=true;
+  }finally{
+    chatBusy=false; $('chatSend').disabled=false;
+    renderChat();
+  }
+}
+$('chatSend').onclick=sendChat;
+$('chatInput').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } };
 /* ---------- save / load ---------- */
 function openExport(mode){
   const m=$('exModal'); m.classList.add('open');

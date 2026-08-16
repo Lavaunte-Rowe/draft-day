@@ -34,6 +34,7 @@
       <button class="tab" data-tab="queue">Queue <span id="qCount" class="qcount" style="display:none">0</span></button>
       <button class="tab" data-tab="team">My team</button>
       <button class="tab" data-tab="log">Log</button>
+      <button class="tab" data-tab="buddy">🏈 Buddy</button>
     </div>
   </div>
 </header>
@@ -96,6 +97,20 @@
   <!-- LOG TAB -->
   <div id="logView" style="display:none">
     <section><h2>Draft log</h2><div id="log"></div></section>
+  </div>
+  <!-- BUDDY CHAT TAB -->
+  <div id="buddyView" style="display:none">
+    <section>
+      <h2>🏈 Draft Buddy</h2>
+      <div class="note" style="margin:0 2px 10px">Chat live about your draft — Buddy sees your full board, roster, and queue.</div>
+      <div class="chat-messages" id="chatMessages"></div>
+    </section>
+  </div>
+</div>
+<div class="chatbar" id="chatbar" style="display:none">
+  <div class="chatbar-in">
+    <input type="text" id="chatInput" placeholder="Ask Buddy anything…" autocomplete="off">
+    <button class="btn primary" id="chatSend">Send</button>
   </div>
 </div>
 <div class="bottombar" id="bottombar" style="display:none">
