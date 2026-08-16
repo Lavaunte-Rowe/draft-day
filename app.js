@@ -305,13 +305,26 @@ function renderBoard(){
     return true;
   });
   const shown=list.slice(0,S.ui.shown);
-  for(const p of shown) el.appendChild(playerRow(p));
+  if(!list.length){
+    const q2=S.ui.search;
+    el.innerHTML=`<div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">${q2?`No players match "${q2}"`:'No players match your filters'}</div>
+        <div class="empty-sub">${S.ui.hideDrafted?'Try showing drafted players, or clear the search/position filter.':'Try a different search or position filter.'}</div>
+      </div>`;
+  } else {
+    for(const p of shown) el.appendChild(playerRow(p));
+  }
   $('showMore').style.display = list.length>S.ui.shown ? 'block':'none';
 }
 function renderQueue(){
   const el=$('queueList'); el.innerHTML='';
   if(!S.queue.length){
-    el.innerHTML='<div class="note" style="text-align:center;padding:24px 10px">Your queue is empty.<br>Star players from the Draft tab while you wait for your turn.</div>';
+    el.innerHTML=`<div class="empty-state">
+        <div class="empty-icon">☆</div>
+        <div class="empty-title">Your queue is empty</div>
+        <div class="empty-sub">Star players from the Draft tab while you wait for your turn.</div>
+      </div>`;
     $('clearGone').style.display='none'; return;
   }
   let nextFound=false, anyGone=false;
@@ -572,7 +585,11 @@ function renderLog(){
       <div style="font-size:11px;font-weight:800;color:${a.kind==='mine'?'var(--me)':'var(--dim)'}">${a.kind==='mine'?'YOU':'Team '+teamOnClock(a.pick)}</div>`;
     el.appendChild(d);
   });
-  if(!S.actions.length) el.innerHTML='<div class="note">No picks yet.</div>';
+  if(!S.actions.length) el.innerHTML=`<div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title">No picks yet</div>
+      <div class="empty-sub">Every pick will show up here as the draft goes.</div>
+    </div>`;
 }
 function renderDraftBoard(){
   const el=$('dbGrid');
