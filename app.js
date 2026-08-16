@@ -8,6 +8,29 @@ let S = {
   ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false}
 };
 const status = {};           // id -> 'taken' | 'mine'
+/* ---------- sleeper enrichment (live injury/depth data + photo ids) ---------- */
+let ENRICH = {};             // id -> {sleeper_id, injury_status, depth_chart_position, depth_chart_order, years_exp}
+let enrichLoaded = false;
+async function loadEnrichment(){
+  const badge = document.getElementById('enrichBadge');
+  if(badge) badge.textContent = '· syncing live data…';
+  try{
+    const res = await fetch('/api/players');
+    if(!res.ok) throw new Error('bad status '+res.status);
+    const data = await res.json();
+    ENRICH = data.players || {};
+    if(badge) badge.textContent = '· live data synced';
+  }catch(e){
+    console.warn('Live player data unavailable — falling back to consensus rankings only.', e);
+    ENRICH = {};
+    if(badge) badge.textContent = '· live data unavailable (using consensus rankings)';
+  }finally{
+    enrichLoaded = true;
+    if(badge) setTimeout(()=>{ if(badge.textContent.includes('synced')) badge.textContent=''; }, 4000);
+    if(S.started) renderAll();
+  }
+}
+loadEnrichment();
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
 const posColor = p => `pos-${p}`;
