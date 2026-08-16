@@ -223,32 +223,42 @@ function renderStatus(){
   $('stNext').textContent = nxt.length? '#'+nxt[0] : '—';
   $('subhdr').textContent = `${S.teams}-team PPR snake · slot ${S.slot} · Rd ${Math.min(roundOf(Math.min(S.pick,totalPicks())),S.rounds)}/${S.rounds}`;
 }
-function playerRow(p, compact){
+function pcardInfoHtml(p, opts){
+  opts=opts||{};
+  const bye = p.b ? `Bye ${p.b}` : 'FA';
+  const chipsHtml = opts.chips ? `<div class="pcard-chips">${opts.chips}</div>` : '';
+  return `<div class="pcard-name">${p.n}${opts.nameExtra||''}${injuryBadgeHtml(p.id)}</div>
+    <div class="pcard-meta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · <span title="${ADP_TOOLTIP}">ADP ${p.adp}</span> · <span class="tierb">Tier ${tiers[p.id]}</span></div>
+    ${chipsHtml}`;
+}
+function queueStarHtml(id){ return inQueue(id) ? ' <span style="color:var(--queue)">★</span>' : ''; }
+function playerRow(p){
   const st = status[p.id];
   const row=document.createElement('div');
-  row.className='row'+(st==='taken'?' gone':'')+(st==='mine'?' mine':'')
+  row.className='pcard'+(st==='taken'?' gone':'')+(st==='mine'?' mine':'')
     +(S.ui.cmp.includes(p.id)?' cmpsel':'');
-  const bye = p.b ? `Bye ${p.b}` : 'FA';
-  row.innerHTML=`<div class="rnk">${p.id}</div>
-    ${avatarHtml(p,'sm')}
-    <div class="pinfo">
-      <div class="pname">${p.n}${inQueue(p.id)?' <span style="color:#f2cc60">★</span>':''}${injuryBadgeHtml(p.id)}</div>
-      <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · <span title="${ADP_TOOLTIP}">ADP ${p.adp}</span> · <span class="tierb">Tier ${tiers[p.id]}</span></div>
-    </div>`;
-  row.querySelector('.pinfo').onclick=()=>{
+  row.innerHTML=`<div class="pcard-top">
+      <div class="pcard-rank">${p.id}</div>
+      ${avatarHtml(p,'sm')}
+      <div class="pcard-info">${pcardInfoHtml(p,{nameExtra:queueStarHtml(p.id)})}</div>
+    </div>
+    <div class="pcard-actions"></div>`;
+  row.querySelector('.pcard-info').onclick=()=>{
     if(S.ui.cmpActive) toggleCompare(p.id); else openPlayer(p.id); };
+  const actions=row.querySelector('.pcard-actions');
   if(!st){
-    row.appendChild(starButton(p.id));
+    actions.appendChild(starButton(p.id));
     const b1=document.createElement('button'); b1.className='btn taken'; b1.textContent='Taken';
     b1.onclick=()=>mark(p.id,'taken');
     const b2=document.createElement('button'); b2.className='btn mine'; b2.textContent='Me';
     b2.onclick=()=>mark(p.id,'mine');
-    row.appendChild(b1); row.appendChild(b2);
+    actions.appendChild(b1); actions.appendChild(b2);
   } else {
-    const tag=document.createElement('div'); tag.style.cssText='font-size:11px;font-weight:800;color:'+(st==='mine'?'var(--me)':'var(--bad)');
+    const tag=document.createElement('div'); tag.className='pcard-tag';
+    tag.style.color = st==='mine' ? 'var(--me)' : 'var(--bad)';
     const a=S.actions.find(x=>x.id===p.id);
-    tag.textContent=(st==='mine'?'MINE':'GONE')+(a?` #${a.pick}`:'');
-    row.appendChild(tag);
+    tag.textContent=(st==='mine'?'MINE':'GONE')+(a?` · pick #${a.pick}`:'');
+    actions.appendChild(tag);
   }
   return row;
 }
@@ -258,22 +268,22 @@ function renderRecs(){
   $('recHdr').textContent = mine ? '🎯 Your pick — best options' : 'Best available (planning ahead)';
   const recs=recommend(5);
   recs.forEach((r,i)=>{
-    const d=document.createElement('div'); d.className='rec'+(i===0?' top':'');
-    const bye=r.p.b?`Bye ${r.p.b}`:'FA';
-    d.innerHTML=`<div class="recrank">${i+1}</div>
-      ${avatarHtml(r.p)}
-      <div class="recmain">
-        <div class="recname">${r.p.n}${inQueue(r.p.id)?' <span style="color:#f2cc60">★</span>':''}${injuryBadgeHtml(r.p.id)}</div>
-        <div class="recmeta"><span class="posbadge ${posColor(r.p.p)}">${r.p.p}${r.p.pr}</span>${teamLogoHtml(r.p.t)}${r.p.t} · ${bye} · <span title="${ADP_TOOLTIP}">ADP ${r.p.adp}</span> · Tier ${tiers[r.p.id]}</div>
-        <div class="reasons">${r.reasons.slice(0,3).map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('')}</div>
-      </div>`;
-    d.querySelector('.recmain').onclick=()=>openPlayer(r.p.id);
-    d.appendChild(starButton(r.p.id));
+    const d=document.createElement('div'); d.className='pcard'+(i===0?' top':'');
+    const chips=r.reasons.slice(0,3).map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('');
+    d.innerHTML=`<div class="pcard-top">
+        <div class="pcard-rank">${i+1}</div>
+        ${avatarHtml(r.p)}
+        <div class="pcard-info">${pcardInfoHtml(r.p,{nameExtra:queueStarHtml(r.p.id), chips})}</div>
+      </div>
+      <div class="pcard-actions"></div>`;
+    d.querySelector('.pcard-info').onclick=()=>openPlayer(r.p.id);
+    const actions=d.querySelector('.pcard-actions');
+    actions.appendChild(starButton(r.p.id));
     const b1=document.createElement('button'); b1.className='btn taken'; b1.textContent='Taken';
     b1.onclick=()=>mark(r.p.id,'taken');
     const b2=document.createElement('button'); b2.className='btn mine'; b2.textContent='Me';
     b2.onclick=()=>mark(r.p.id,'mine');
-    d.appendChild(b1); d.appendChild(b2);
+    actions.appendChild(b1); actions.appendChild(b2);
     el.appendChild(d);
   });
 }
@@ -305,32 +315,40 @@ function renderQueue(){
     const isNext = !st && !nextFound; if(isNext) nextFound=true;
     if(st) anyGone=true;
     const d=document.createElement('div');
-    d.className='qrow'+(isNext?' next':'')+(st?' gonerow':'');
-    d.innerHTML=`<div class="qord">
-        <button data-d="-1" ${i===0?'disabled':''}>▲</button>
-        <button data-d="1" ${i===S.queue.length-1?'disabled':''}>▼</button></div>
-      <div class="rnk">${i+1}</div>
-      ${avatarHtml(p,'sm')}
-      <div class="pinfo">
-        <div class="pname">${p.n}${isNext?' <span style="color:#f2cc60;font-size:11px;font-weight:800">NEXT UP</span>':''}${injuryBadgeHtml(id)}</div>
-        <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${p.b?'Bye '+p.b:'FA'} · <span title="${ADP_TOOLTIP}">ADP ${p.adp}</span> · Tier ${tiers[p.id]}${st?(st==='mine'?' · <b style="color:var(--me)">MINE</b>':' · <b style="color:var(--bad)">GONE</b>'):''}</div>
-      </div>`;
-    d.querySelector('.pinfo').onclick=()=>openPlayer(id);
+    d.className='pcard'+(isNext?' next':'')+(st?' crossed gone':'');
+    const nameExtra=isNext?' <span class="nextup">NEXT UP</span>':'';
+    d.innerHTML=`<div class="pcard-top">
+        <div class="qord">
+          <button data-d="-1" ${i===0?'disabled':''}>▲</button>
+          <button data-d="1" ${i===S.queue.length-1?'disabled':''}>▼</button>
+        </div>
+        <div class="pcard-rank">${i+1}</div>
+        ${avatarHtml(p,'sm')}
+        <div class="pcard-info">${pcardInfoHtml(p,{nameExtra})}</div>
+      </div>
+      <div class="pcard-actions"></div>`;
+    d.querySelector('.pcard-info').onclick=()=>openPlayer(id);
     d.querySelector('.qord').onclick=e=>{
       const b=e.target.closest('button'); if(!b||b.disabled)return;
       const j=i+Number(b.dataset.d);
       [S.queue[i],S.queue[j]]=[S.queue[j],S.queue[i]]; renderQueue();
     };
+    const actions=d.querySelector('.pcard-actions');
     if(!st){
       const b1=document.createElement('button'); b1.className='btn taken'; b1.textContent='Taken';
       b1.onclick=()=>mark(id,'taken');
       const b2=document.createElement('button'); b2.className='btn mine'; b2.textContent='Me';
       b2.onclick=()=>mark(id,'mine');
-      d.appendChild(b1); d.appendChild(b2);
+      actions.appendChild(b1); actions.appendChild(b2);
+    } else {
+      const tag=document.createElement('div'); tag.className='pcard-tag';
+      tag.style.color = st==='mine' ? 'var(--me)' : 'var(--bad)';
+      tag.textContent = st==='mine' ? 'MINE' : 'GONE';
+      actions.appendChild(tag);
     }
     const x=document.createElement('button'); x.className='qx'; x.textContent='✕';
     x.onclick=()=>{ S.queue.splice(i,1); renderAll(); };
-    d.appendChild(x);
+    actions.appendChild(x);
     el.appendChild(d);
   });
   $('clearGone').style.display = anyGone ? 'block':'none';
@@ -524,7 +542,7 @@ function renderTeam(){
   for(const s of slots){
     const d=document.createElement('div'); d.className='slotrow';
     d.innerHTML=`<div class="slotlab">${s.lab}</div>`+
-      (s.pl ? `<div><b>${s.pl.n}</b> <span style="color:var(--dim);font-size:12px">· ${s.pl.p}${s.pl.pr} ${s.pl.t} · Bye ${s.pl.b||'—'} · pick #${s.pl.pickNo}</span></div>`
+      (s.pl ? `${avatarHtml(s.pl,'sm')}<div><b>${s.pl.n}</b>${injuryBadgeHtml(s.pl.id)} <span style="color:var(--dim);font-size:12px">· ${teamLogoHtml(s.pl.t)}${s.pl.t} · Bye ${s.pl.b||'—'} · pick #${s.pl.pickNo}</span></div>`
             : `<div class="empty">— open —</div>`);
     el.appendChild(d);
   }
@@ -542,8 +560,9 @@ function renderLog(){
     const p=PLAYERS.find(x=>x.id===a.id);
     const d=document.createElement('div'); d.className='logrow';
     d.innerHTML=`<div class="logpick">#${a.pick} R${roundOf(a.pick)}</div>
+      ${avatarHtml(p,'sm')}
       <span class="posbadge ${posColor(p.p)}">${p.p}</span>
-      <div style="flex:1">${p.n} <span style="color:var(--dim);font-size:12px">${p.t}</span></div>
+      <div style="flex:1; min-width:0">${p.n}${injuryBadgeHtml(p.id)} <span style="color:var(--dim);font-size:12px">${teamLogoHtml(p.t)}${p.t}</span></div>
       <div style="font-size:11px;font-weight:800;color:${a.kind==='mine'?'var(--me)':'var(--dim)'}">${a.kind==='mine'?'YOU':'Team '+teamOnClock(a.pick)}</div>`;
     el.appendChild(d);
   });
