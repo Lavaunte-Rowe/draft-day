@@ -48,6 +48,7 @@ function avatarHtml(p, size){
     : '';
   return `<div class="${cls}" style="--ring:${color}">${fb}${img}</div>`;
 }
+const ADP_TOOLTIP='Consensus ranking, manually compiled July 2026 — not a live feed.';
 const INJURY_LABELS={Q:'Questionable', D:'Doubtful', O:'Out', IR:'Injured Reserve', PUP:'PUP', SUSP:'Suspended', NA:'Not Active'};
 function injuryBadgeHtml(id){
   const e=ENRICH[id];
@@ -232,7 +233,7 @@ function playerRow(p, compact){
     ${avatarHtml(p,'sm')}
     <div class="pinfo">
       <div class="pname">${p.n}${inQueue(p.id)?' <span style="color:#f2cc60">★</span>':''}${injuryBadgeHtml(p.id)}</div>
-      <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · ADP ${p.adp} · <span class="tierb">Tier ${tiers[p.id]}</span></div>
+      <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · <span title="${ADP_TOOLTIP}">ADP ${p.adp}</span> · <span class="tierb">Tier ${tiers[p.id]}</span></div>
     </div>`;
   row.querySelector('.pinfo').onclick=()=>{
     if(S.ui.cmpActive) toggleCompare(p.id); else openPlayer(p.id); };
@@ -263,7 +264,7 @@ function renderRecs(){
       ${avatarHtml(r.p)}
       <div class="recmain">
         <div class="recname">${r.p.n}${inQueue(r.p.id)?' <span style="color:#f2cc60">★</span>':''}${injuryBadgeHtml(r.p.id)}</div>
-        <div class="recmeta"><span class="posbadge ${posColor(r.p.p)}">${r.p.p}${r.p.pr}</span>${teamLogoHtml(r.p.t)}${r.p.t} · ${bye} · ADP ${r.p.adp} · Tier ${tiers[r.p.id]}</div>
+        <div class="recmeta"><span class="posbadge ${posColor(r.p.p)}">${r.p.p}${r.p.pr}</span>${teamLogoHtml(r.p.t)}${r.p.t} · ${bye} · <span title="${ADP_TOOLTIP}">ADP ${r.p.adp}</span> · Tier ${tiers[r.p.id]}</div>
         <div class="reasons">${r.reasons.slice(0,3).map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('')}</div>
       </div>`;
     d.querySelector('.recmain').onclick=()=>openPlayer(r.p.id);
@@ -312,7 +313,7 @@ function renderQueue(){
       ${avatarHtml(p,'sm')}
       <div class="pinfo">
         <div class="pname">${p.n}${isNext?' <span style="color:#f2cc60;font-size:11px;font-weight:800">NEXT UP</span>':''}${injuryBadgeHtml(id)}</div>
-        <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${p.b?'Bye '+p.b:'FA'} · ADP ${p.adp} · Tier ${tiers[p.id]}${st?(st==='mine'?' · <b style="color:var(--me)">MINE</b>':' · <b style="color:var(--bad)">GONE</b>'):''}</div>
+        <div class="pmeta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${p.b?'Bye '+p.b:'FA'} · <span title="${ADP_TOOLTIP}">ADP ${p.adp}</span> · Tier ${tiers[p.id]}${st?(st==='mine'?' · <b style="color:var(--me)">MINE</b>':' · <b style="color:var(--bad)">GONE</b>'):''}</div>
       </div>`;
     d.querySelector('.pinfo').onclick=()=>openPlayer(id);
     d.querySelector('.qord').onclick=e=>{
@@ -375,7 +376,7 @@ function openPlayer(id){
     </div>
     <div class="pd-facts">
       <div class="fact"><div class="v">#${p.id}</div><div class="l">Rank</div></div>
-      <div class="fact"><div class="v">${p.adp}</div><div class="l">ADP</div></div>
+      <div class="fact" title="${ADP_TOOLTIP}"><div class="v">${p.adp}</div><div class="l">ADP</div></div>
       <div class="fact"><div class="v">${tiers[p.id]}</div><div class="l">Tier</div></div>
       <div class="fact"><div class="v">${p.b||'—'}</div><div class="l">Bye</div></div>
     </div>
@@ -457,8 +458,8 @@ function openCompare(){
   html+=grid(
     `<div class="cmp-cell lab"></div>`+info.map(x=>
       `<div class="cmp-cell head" style="display:flex; flex-direction:column; align-items:center; gap:4px">${avatarHtml(x.p,'sm')}<div>${x.p.n}</div><span class="sub"><span class="posbadge ${posColor(x.p.p)}">${x.p.p}${x.p.pr}</span>${x.p.t}${x.st?(x.st==='mine'?' · MINE':' · GONE'):''}</span></div>`).join('')
-    +rowH('Consensus', info.map(x=>x.p.id), -1)
-    +rowH('ADP', info.map(x=>x.p.adp), -1)
+    +rowH(`<span title="${ADP_TOOLTIP}">Consensus</span>`, info.map(x=>x.p.id), -1)
+    +rowH(`<span title="${ADP_TOOLTIP}">ADP</span>`, info.map(x=>x.p.adp), -1)
     +rowH('Tier', info.map(x=>tiers[x.p.id]), -1)
     +rowH('Bye', info.map(x=>x.p.b||null), 0, info.map(x=>x.p.b&&myByes[x.p.b]?`⚠ ${myByes[x.p.b]} of yours`:''))
     +rowH('Injury', info.map(x=>{ const e=ENRICH[x.p.id]; return e?(e.injury_status||'Active'):null; }), 0)
