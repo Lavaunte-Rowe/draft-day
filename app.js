@@ -39,12 +39,15 @@ function initials(name){
   return (first+last).toUpperCase();
 }
 function avatarHtml(p, size){
-  const cls='avatar-wrap'+(size?' '+size:'');
   const color=TEAM_COLORS[p.t]||TEAM_COLORS.FA;
   const fb=`<div class="avatar-fallback" style="background:${color}">${initials(p.n)}</div>`;
   const e=ENRICH[p.id];
-  const img=(e&&e.sleeper_id)
-    ? `<img class="avatar-img" src="https://sleepercdn.com/content/nfl/players/${e.sleeper_id}.jpg" loading="lazy" onerror="this.style.display='none'">`
+  const hasImg=e&&e.sleeper_id;
+  const cls='avatar-wrap'+(size?' '+size:'')+(hasImg?' loading':'');
+  const img=hasImg
+    ? `<img class="avatar-img" src="https://sleepercdn.com/content/nfl/players/${e.sleeper_id}.jpg" loading="lazy"
+        onload="this.classList.add('loaded'); this.parentElement.classList.remove('loading')"
+        onerror="this.style.display='none'; this.parentElement.classList.remove('loading')">`
     : '';
   return `<div class="${cls}" style="--ring:${color}">${fb}${img}</div>`;
 }
@@ -58,7 +61,9 @@ function injuryBadgeHtml(id){
 function teamLogoHtml(team){
   if(!team||team==='FA') return '';
   const color=TEAM_COLORS[team]||TEAM_COLORS.FA;
-  return `<span class="logo-wrap" style="background:${color}"><span class="logo-fallback">${team}</span><img class="logo-img" src="https://a.espncdn.com/i/teamlogos/nfl/500/${team}.png" loading="lazy" onerror="this.style.display='none'"></span>`;
+  return `<span class="logo-wrap loading" style="background:${color}"><span class="logo-fallback">${team}</span><img class="logo-img" src="https://a.espncdn.com/i/teamlogos/nfl/500/${team}.png" loading="lazy"
+      onload="this.classList.add('loaded'); this.parentElement.classList.remove('loading')"
+      onerror="this.style.display='none'; this.parentElement.classList.remove('loading')"></span>`;
 }
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
