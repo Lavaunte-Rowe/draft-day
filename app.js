@@ -872,14 +872,17 @@ function renderFlowCard(){
   el.innerHTML=`<h3>Draft flow</h3><div class="flowtxt">${S.actions.length} of ${totalPicks()} picks logged. You hold slot ${S.slot}, so your picks run ${nxt}, and on down the snake.</div>`;
 }
 /* ---------- sidebar: positional trend ---------- */
+const TREND_POS_ORDER=['QB','RB','WR','TE','K','DST'];
 function computeTrend(){
   const roundNums=[...new Set(S.actions.map(a=>roundOf(a.pick)))].sort((a,b)=>a-b);
   const rounds=roundNums.map(r=>{
     const picksInRound=S.actions.filter(a=>roundOf(a.pick)===r);
     const counts={};
     for(const a of picksInRound){ const p=PLAYERS.find(x=>x.id===a.id); counts[p.p]=(counts[p.p]||0)+1; }
-    const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
-    return {r, pos:top[0], count:top[1], total:picksInRound.length};
+    const total=picksInRound.length;
+    const segments=TREND_POS_ORDER.filter(pos=>counts[pos]).map(pos=>({pos, count:counts[pos]}));
+    const top=[...segments].sort((a,b)=>b.count-a.count)[0];
+    return {r, total, segments, pos:top.pos, count:top.count};
   });
   let run=0, runPos=null;
   if(S.actions.length){
@@ -900,20 +903,25 @@ function renderTrendCard(){
     return;
   }
   const {rounds, run, runPos, hasRun}=computeTrend();
-  const maxCount=Math.max(...rounds.map(r=>r.total), 1);
+  const usedPositions=new Set(rounds.flatMap(r=>r.segments.map(s=>s.pos)));
   const barsHtml=rounds.map(r=>{
-    const pct=Math.max(18, Math.round((r.count/maxCount)*100));
+    const segsHtml=r.segments.map(seg=>{
+      const share=seg.count/r.total;
+      const showLabel=share>=0.22;
+      return `<div class="trendseg" style="flex:${seg.count} 0 0; background:var(--${seg.pos.toLowerCase()})" title="${seg.pos} ${seg.count}/${r.total}">${showLabel?`<span class="trendseg-lab">${seg.pos} ${seg.count}</span>`:''}</div>`;
+    }).join('');
     return `<div class="trendbar-col">
-        <div class="trendbar" style="height:${pct}%; background:var(--${r.pos.toLowerCase()})">
-          <span class="trendbar-lab">${r.pos} ${r.count}/${r.total}</span>
-        </div>
+        <div class="trendbar">${segsHtml}</div>
         <div class="trendbar-rd">Rd ${r.r}</div>
       </div>`;
   }).join('');
+  const legendHtml=TREND_POS_ORDER.filter(pos=>usedPositions.has(pos)).map(pos=>
+    `<span class="trendlegend-item"><span class="trendlegend-dot" style="background:var(--${pos.toLowerCase()})"></span>${pos}</span>`).join('');
   const recentTxt=`Last ${Math.min(10,S.actions.length)} picks: `+S.actions.slice(-10).map(a=>PLAYERS.find(p=>p.id===a.id).p).join(', ');
   const badge=hasRun?`<span class="trendbadge dd-pulse">${runPos} run · ${run} straight</span>`:'';
   el.innerHTML=`<h3>Trend${badge}</h3>
-    <div class="note" style="margin:0 0 8px">Most-drafted position each round, and how much of the round it took.</div>
+    <div class="note" style="margin:0 0 8px">Full position mix drafted each round.</div>
+    <div class="trendlegend">${legendHtml}</div>
     <div class="trendchart">${barsHtml}</div>
     <div class="note" style="margin-top:6px">${recentTxt}</div>`;
   if(wrapper){
