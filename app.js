@@ -1255,6 +1255,7 @@ $('hotTakesBtn').onclick=()=>{
 };
 /* ---------- save / load ---------- */
 function openExport(mode){
+  $('bottombar').classList.remove('expanded');
   const m=$('exModal'); m.classList.add('open');
   if(mode==='claude'){
     $('exTitle').textContent='Ask Claude — draft state';
@@ -1273,6 +1274,10 @@ function openExport(mode){
 }
 $('askClaude').onclick=()=>openExport('claude');
 $('saveBtn').onclick=()=>openExport('save');
+$('bbToggle').onclick=(e)=>{ e.stopPropagation(); $('bottombar').classList.toggle('expanded'); };
+document.addEventListener('click', e=>{
+  if(!$('bottombar').contains(e.target)) $('bottombar').classList.remove('expanded');
+});
 $('exClose').onclick=()=>$('exModal').classList.remove('open');
 $('exCopy').onclick=async()=>{
   const t=$('exText');
