@@ -1050,6 +1050,10 @@ function mark(id, kind){
     const p=PLAYERS.find(x=>x.id===id);
     if(!confirm(`It's your turn — mark ${p.n} as taken by someone else instead of drafting them yourself?`)) return;
   }
+  if(kind==='mine' && teamOnClock(S.pick)!==S.slot){
+    const p=PLAYERS.find(x=>x.id===id);
+    if(!confirm(`It's not your turn (${teamLabel(teamOnClock(S.pick))} is on the clock) — add ${p.n} to your team anyway?`)) return;
+  }
   S.actions.push({id, kind, pick:S.pick});
   S.pick++;
   rebuildStatus();
