@@ -1046,6 +1046,10 @@ function renderAll(){
 function mark(id, kind){
   if(status[id]) return;
   if(S.pick>totalPicks()){ toast('Draft is complete'); return; }
+  if(kind==='taken' && teamOnClock(S.pick)===S.slot){
+    const p=PLAYERS.find(x=>x.id===id);
+    if(!confirm(`It's your turn — mark ${p.n} as taken by someone else instead of drafting them yourself?`)) return;
+  }
   S.actions.push({id, kind, pick:S.pick});
   S.pick++;
   rebuildStatus();
