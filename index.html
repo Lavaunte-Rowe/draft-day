@@ -23,6 +23,7 @@
     <div class="spacer"></div>
     <button class="btn ghost" id="simBtn" style="display:none">Sim pick</button>
     <button class="btn ghost" id="simToMineBtn" style="display:none">Sim to my pick</button>
+    <button class="iconbtn" id="authBtn" aria-label="Account" style="display:none">👤</button>
     <button class="iconbtn" id="undoBtn" aria-label="Undo">↩</button>
     <button class="iconbtn" id="setBtn" aria-label="Settings">⚙</button>
   </div>
@@ -194,12 +195,13 @@
   </div>
   <label>Starting lineup + bench</label>
   <div class="reqgrid" id="mReq"></div>
+  <label>Team names <span style="text-transform:none; letter-spacing:0">(optional — plug these in after your live draft)</span></label>
+  <div id="mTeamNames" class="teamnames"></div>
   <div class="sheetbtns">
     <button class="btn ghost" id="mCancel">Cancel</button>
     <button class="btn primary" id="mSave">Save</button>
   </div>
   <div class="sheetbtns"><button class="btn taken" id="mReset" style="flex:1">Reset entire draft</button></div>
-  <div class="sheetbtns" id="mSignOutRow" style="display:none"><button class="btn ghost" id="mSignOut" style="flex:1">Sign out</button></div>
 </div></div>
 <!-- EXPORT MODAL -->
 <div class="modal" id="exModal"><div class="sheet">

@@ -9,9 +9,15 @@ let S = {
   pane:null,                 // null (split) | 'main' | 'side' — maximized pane
   notes:[],                  // [{id, text, pinned, stamp}]
   sideOrder:['needs','flow','reset','trend','notes'],
+  teamNames:{},               // {teamNumber: 'Custom Name'} — set from Settings after the live draft
   ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false,
     logSort:'desc', logQ:'', logPos:'ALL', logTeam:'ALL', hotTakes:false}
 };
+function teamLabel(n, short){
+  const custom = S.teamNames && S.teamNames[n];
+  if(custom) return custom;
+  return short ? ('T'+n) : ('Team '+n);
+}
 const status = {};           // id -> 'taken' | 'mine'
 /* ---------- sleeper enrichment (live injury/depth data + photo ids) ---------- */
 let ENRICH = {};             // id -> {sleeper_id, injury_status, depth_chart_position, depth_chart_order, years_exp}
@@ -85,17 +91,24 @@ async function loadFromCloud(){
     }
   }catch(e){ console.warn('Cloud load failed', e); }
 }
+function updateAuthBtn(){
+  const btn=$('authBtn');
+  if(!cloudConfigured || !cloudUser){ btn.style.display='none'; return; }
+  btn.style.display='inline-flex';
+  btn.title = `Signed in as ${cloudUser.email} — tap to sign out`;
+}
 function showAuthView(){
   $('authView').style.display='block';
   $('setupView').style.display='none';
   $('statusbar').style.display='none'; $('tabsScroll').style.display='none';
   $('bottombar').style.display='none'; $('chatbar').style.display='none';
   $('wrap').classList.remove('two-pane');
+  $('authBtn').style.display='none';
 }
 async function onSignedIn(user){
   cloudUser = user;
   $('authView').style.display='none';
-  $('mSignOutRow').style.display='block';
+  updateAuthBtn();
   await loadFromCloud();
   cloudReady = true;
   if(S.started){ showApp(); renderAll(); }
@@ -142,7 +155,7 @@ function initCloudAuth(){
       $('authSubmit').disabled=false;
     }
   };
-  $('mSignOut').onclick=async()=>{
+  $('authBtn').onclick=async()=>{
     if(!confirm('Sign out?')) return;
     await sb.auth.signOut();
     location.reload();
@@ -342,7 +355,7 @@ function renderStatus(){
   $('stPick').textContent = done ? 'End' : `${S.pick}`;
   const mine = !done && teamOnClock(S.pick)===S.slot;
   $('stClockBox').classList.toggle('onclock', mine);
-  $('stClock').textContent = done ? '—' : (mine ? 'YOU' : 'Team '+teamOnClock(S.pick));
+  $('stClock').textContent = done ? '—' : (mine ? 'YOU' : teamLabel(teamOnClock(S.pick)));
   $('stClockLab').textContent = mine ? 'Your pick!' : 'On the clock';
   const nxt = nextMyPicks(1);
   $('stNext').textContent = !nxt.length ? '—' : (nxt[0]===S.pick ? 'Now' : nxt[0]-S.pick);
@@ -566,7 +579,7 @@ function openPlayer(id){
     btns.appendChild(bs); btns.appendChild(bc); btns.appendChild(b1); btns.appendChild(b2);
   } else {
     const a=S.actions.find(x=>x.id===id);
-    btns.innerHTML=`<div class="note" style="flex:1;text-align:center">${st==='mine'?'On your roster':'Drafted by Team '+teamOnClock(a.pick)} — pick #${a.pick}</div>`;
+    btns.innerHTML=`<div class="note" style="flex:1;text-align:center">${st==='mine'?'On your roster':'Drafted by '+teamLabel(teamOnClock(a.pick))} — pick #${a.pick}</div>`;
   }
   $('pModal').classList.add('open');
 }
@@ -708,7 +721,7 @@ function rebuildLogTeamFilter(){
   const sel=$('logTeamFilter');
   const cur=sel.value || S.ui.logTeam;
   sel.innerHTML=`<option value="ALL">All teams</option><option value="MINE">My picks</option>`
-    + Array.from({length:S.teams},(_, i)=>`<option value="${i+1}">Team ${i+1}</option>`).join('');
+    + Array.from({length:S.teams},(_, i)=>`<option value="${i+1}">${teamLabel(i+1)}</option>`).join('');
   sel.value = [...sel.options].some(o=>o.value===cur) ? cur : 'ALL';
   S.ui.logTeam = sel.value;
 }
@@ -750,7 +763,7 @@ function renderLog(){
       ${avatarHtml(p,'sm')}
       <span class="posbadge ${posColor(p.p)}">${p.p}</span>
       <div style="flex:1; min-width:0">${p.n}${injuryBadgeHtml(p.id)} <span style="color:var(--dim);font-size:12px">${teamLogoHtml(p.t)}${p.t}</span></div>
-      <div style="font-size:11px;font-weight:800;color:${a.kind==='mine'?'var(--me)':'var(--dim)'}">${a.kind==='mine'?'YOU':'Team '+teamOnClock(a.pick)}</div>`;
+      <div style="font-size:11px;font-weight:800;color:${a.kind==='mine'?'var(--me)':'var(--dim)'}">${a.kind==='mine'?'YOU':teamLabel(teamOnClock(a.pick))}</div>`;
     d.onclick=()=>openPlayer(a.id);
     el.appendChild(d);
   });
@@ -761,7 +774,7 @@ function renderDraftBoard(){
   let html='<div class="dbcell dbcorner"></div>';
   for(let t=1;t<=S.teams;t++){
     const mine=t===S.slot;
-    html+=`<div class="dbcell dbhead${mine?' dbmine':''}">${mine?'YOU':'T'+t}</div>`;
+    html+=`<div class="dbcell dbhead${mine?' dbmine':''}">${mine?'YOU':teamLabel(t,true)}</div>`;
   }
   for(let r=1;r<=S.rounds;r++){
     html+=`<div class="dbcell dbrnd">${r}</div>`;
@@ -1218,12 +1231,25 @@ $('cClose').onclick=()=>$('cModal').classList.remove('open');
 $('cModal').onclick=e=>{ if(e.target===$('cModal')) $('cModal').classList.remove('open'); };
 $('cAsk').onclick=()=>{ $('cModal').classList.remove('open'); openExport('cmp'); };
 /* ---------- settings ---------- */
+function renderTeamNamesEditor(count){
+  const el=$('mTeamNames'); el.innerHTML='';
+  for(let i=1;i<=count;i++){
+    const row=document.createElement('div'); row.className='tnrow';
+    row.innerHTML=`<span class="tnlab">Team ${i}${i===S.slot?' (you)':''}</span><input type="text" data-team="${i}" placeholder="Team ${i}" value="${escapeHtml(S.teamNames[i]||'')}">`;
+    el.appendChild(row);
+  }
+}
 $('setBtn').onclick=()=>{
   if(!S.started){ toast('Finish setup first'); return; }
   fillSelect($('mTeams'),4,20,S.teams); fillSelect($('mSlot'),1,S.teams,S.slot);
   fillSelect($('mRounds'),8,25,S.rounds); $('mPick').value=S.pick;
   window._mreq={...S.req}; reqEditor($('mReq'), window._mreq);
-  $('mTeams').onchange=()=>fillSelect($('mSlot'),1,Number($('mTeams').value),Math.min(S.slot,Number($('mTeams').value)));
+  renderTeamNamesEditor(S.teams);
+  $('mTeams').onchange=()=>{
+    const n=Number($('mTeams').value);
+    fillSelect($('mSlot'),1,n,Math.min(S.slot,n));
+    renderTeamNamesEditor(n);
+  };
   $('setModal').classList.add('open');
 };
 $('mCancel').onclick=()=>$('setModal').classList.remove('open');
@@ -1231,6 +1257,12 @@ $('mSave').onclick=()=>{
   S.teams=Number($('mTeams').value); S.slot=Number($('mSlot').value);
   S.rounds=Number($('mRounds').value); S.req={...window._mreq};
   S.pick=Math.max(1,Math.min(totalPicks()+1,Number($('mPick').value)||1));
+  const newNames={};
+  $('mTeamNames').querySelectorAll('input[data-team]').forEach(inp=>{
+    const v=inp.value.trim();
+    if(v) newNames[Number(inp.dataset.team)]=v;
+  });
+  S.teamNames=newNames;
   $('setModal').classList.remove('open'); renderAll(); toast('Settings saved');
 };
 function resetDraft(){
