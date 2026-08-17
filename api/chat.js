@@ -8,6 +8,8 @@ Respond in plain prose only — never use markdown syntax of any kind: no **aste
 
 You're given the user's full live draft state below: their roster, the app's own best-available list (ranked by its tier/ADP/positional-need model), recent picks, and their queue. Tier and positional rank in that state are a manually-compiled consensus, not a live feed — mention that if it's relevant. ADP is live, pulled daily from real drafts, except for deep bench players with no live draft volume, where it falls back to the consensus number. Injury status and depth chart info embedded in the player data (when present) is live, not static.`;
 
+const HOT_TAKES_SUFFIX = `\n\nHot takes mode is ON: be more opinionated and blunt. Don't hedge, don't say "it depends" — pick a side and defend it. Still plain prose, still short.`;
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
@@ -22,7 +24,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const { messages, draftState } = req.body || {};
+  const { messages, draftState, hotTakes } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: "invalid_request", message: "messages array is required" });
     return;
@@ -46,7 +48,7 @@ module.exports = async (req, res) => {
       model: "claude-opus-5",
       max_tokens: 1536,
       output_config: { effort: "medium" },
-      system: `${SYSTEM_PROMPT}\n\n---\nCURRENT DRAFT STATE:\n${String(draftState || "(draft not started yet)").slice(0, 20000)}`,
+      system: `${SYSTEM_PROMPT}${hotTakes === true ? HOT_TAKES_SUFFIX : ""}\n\n---\nCURRENT DRAFT STATE:\n${String(draftState || "(draft not started yet)").slice(0, 20000)}`,
       messages: cleanMessages,
     });
     stream.on("text", (delta) => {

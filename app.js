@@ -10,7 +10,7 @@ let S = {
   notes:[],                  // [{id, text, pinned, stamp}]
   sideOrder:['needs','flow','reset','trend','notes'],
   ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false,
-    logSort:'desc', logQ:'', logPos:'ALL', logTeam:'ALL'}
+    logSort:'desc', logQ:'', logPos:'ALL', logTeam:'ALL', hotTakes:false}
 };
 const status = {};           // id -> 'taken' | 'mine'
 /* ---------- sleeper enrichment (live injury/depth data + photo ids) ---------- */
@@ -584,7 +584,9 @@ function toggleCompare(id){
 }
 function renderCmpBar(){
   const c=S.ui.cmp;
+  const wasShown=$('cmpBar').classList.contains('show');
   $('cmpBar').classList.toggle('show', c.length>0);
+  if(c.length>0 && !wasShown) $('cmpBar').querySelector('.cmpbar-in').classList.add('dd-rise');
   $('cmpNames').innerHTML = c.map(id=>PLAYERS.find(p=>p.id===id).n.split(' ').slice(-1)[0]).join(' <span style="color:var(--dim)">vs</span> ');
   $('cmpOpen').disabled = c.length<2;
   $('cmpOpen').style.opacity = c.length<2?'.5':'1';
@@ -1088,7 +1090,18 @@ let chatBusy=false;
 function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+const QUICK_PROMPTS=['Who should I take?', 'Am I too heavy at one position?', 'Best value on the board?'];
+function renderQuickPrompts(){
+  const el=$('quickPrompts'); if(!el) return;
+  if(chatHistory.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='flex';
+  el.innerHTML=QUICK_PROMPTS.map(q=>`<button class="qp">${q}</button>`).join('');
+  el.querySelectorAll('.qp').forEach((b,i)=>{
+    b.onclick=()=>{ $('chatInput').value=QUICK_PROMPTS[i]; sendChat(); };
+  });
+}
 function renderChat(){
+  renderQuickPrompts();
   const el=$('chatMessages');
   if(!chatHistory.length){
     el.innerHTML=`<div class="empty-state">
@@ -1123,6 +1136,7 @@ async function sendChat(){
       body: JSON.stringify({
         messages: chatHistory.slice(0,-1).map(m=>({role:m.role, content:m.content})),
         draftState,
+        hotTakes: S.ui.hotTakes,
       }),
     });
     if(!res.ok || !res.body){
@@ -1152,6 +1166,11 @@ async function sendChat(){
 $('chatSend').onclick=sendChat;
 $('chatInput').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } };
 $('blAsk').onclick=()=>{ S.ui.tab='buddy'; renderAll(); };
+$('hotTakesBtn').onclick=()=>{
+  S.ui.hotTakes=!S.ui.hotTakes;
+  $('hotTakesBtn').classList.toggle('active', S.ui.hotTakes);
+  toast(S.ui.hotTakes ? '🔥 Hot takes on' : 'Hot takes off');
+};
 /* ---------- save / load ---------- */
 function openExport(mode){
   const m=$('exModal'); m.classList.add('open');
