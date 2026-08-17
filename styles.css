@@ -137,19 +137,32 @@
   .tab.active{background:transparent; color:var(--text); border-color:transparent; border-bottom-color:var(--accent);}
   /* recommendations */
   .recsec h2, section h2{font-size:var(--fs-label); text-transform:uppercase; letter-spacing:.09em; color:var(--dim); margin:14px 2px 8px;}
+  .recsec h2::before{content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent);
+    margin-right:6px; vertical-align:1px;}
+  .recsec h2.dd-pulse::before{animation:dd-pulse 1.6s ease-in-out infinite;}
+  /* buddy latest strip */
+  .buddylatest{display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--r-md); padding:10px 12px; margin:10px 0;}
+  .bl-avatar{font-size:18px; flex:none;}
+  .bl-text{flex:1; min-width:0; font-size:12.5px; color:var(--text2); overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap;}
+  .buddylatest .btn{flex:none; padding:7px 12px; font-size:11.5px;}
   /* unified player card — used by board, recs, and queue rows */
   .pcard{background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); padding:12px; margin-bottom:8px;
     transition:border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);}
   .pcard.top{border-color:var(--accent-border); background:var(--accent-tint2);}
   .pcard.mine{border-color:var(--pos-border);}
   .pcard.gone{opacity:.5;}
+  .pcard.gone .pcard-name{text-decoration:line-through;}
+  .pcard.rowrail{border-left-width:4px; border-left-style:solid;}
   .pcard.cmpsel{border-color:var(--queue); background:var(--pin-bg);}
   .pcard.next{border-color:var(--queue); background:var(--pin-bg);}
   .pcard.crossed .pcard-name{text-decoration:line-through; color:var(--dim);}
   .pcard-top{display:flex; align-items:flex-start; gap:10px;}
   .pcard-rank{width:20px; text-align:center; font-size:13px; color:var(--dim); font-weight:700; flex:none; padding-top:8px;
     font-variant-numeric:tabular-nums;}
-  .pcard.top .pcard-rank{color:var(--accent-text); font-size:17px;}
+  .pcard.top .pcard-rank{width:22px; height:22px; line-height:22px; border-radius:50%; background:var(--accent);
+    color:var(--accent-ink); font-size:12px; font-weight:700; text-align:center; padding-top:0;}
   .pcard-info{flex:1; min-width:0; cursor:pointer;}
   .pcard-name{font-size:16px; font-weight:600; color:var(--text); line-height:1.3;}
   .pcard-meta{font-size:var(--fs-meta); color:var(--dim); margin-top:3px; line-height:1.4;}
@@ -176,6 +189,7 @@
     flex:none; border:2px solid var(--ring, var(--line)); background:var(--panel2);}
   .avatar-wrap.sm{width:26px; height:26px; border-width:1.5px;}
   .avatar-wrap.lg{width:56px; height:56px; border-width:2.5px;}
+  .avatar-wrap.md{width:46px; height:46px; border-width:2px;}
   .avatar-fallback{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     font-weight:700; color:#fff; font-size:12px; overflow:hidden;}
   .avatar-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center;

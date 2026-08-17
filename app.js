@@ -359,8 +359,9 @@ function queueStarHtml(id){ return inQueue(id) ? ' <span style="color:var(--queu
 function playerRow(p){
   const st = status[p.id];
   const row=document.createElement('div');
-  row.className='pcard'+(st==='taken'?' gone':'')+(st==='mine'?' mine':'')
+  row.className='pcard rowrail'+(st==='taken'?' gone':'')+(st==='mine'?' mine':'')
     +(S.ui.cmp.includes(p.id)?' cmpsel':'');
+  row.style.borderLeftColor = TEAM_COLORS[p.t]||TEAM_COLORS.FA;
   row.innerHTML=`<div class="pcard-top">
       <div class="pcard-rank">${p.id}</div>
       ${avatarHtml(p,'sm')}
@@ -389,27 +390,36 @@ function playerRow(p){
 function renderRecs(){
   const el=$('recs'); el.innerHTML='';
   const mine = S.pick<=totalPicks() && teamOnClock(S.pick)===S.slot;
-  $('recHdr').textContent = mine ? '🎯 Your pick — best options' : 'Best available (planning ahead)';
-  const recs=recommend(5);
+  $('recsSection').style.display = mine ? 'block' : 'none';
+  if(!mine) return;
+  $('recHdr').innerHTML = `<span class="dd-pulse" style="display:inline-block">RECOMMENDED NOW</span> <span style="float:right; color:var(--dim); text-transform:none; letter-spacing:0">pick #${S.pick}</span>`;
+  const recs=recommend(2);
   recs.forEach((r,i)=>{
-    const d=document.createElement('div'); d.className='pcard'+(i===0?' top':'');
+    const d=document.createElement('div'); d.className='pcard top';
     const chips=r.reasons.slice(0,3).map(x=>`<span class="chip ${x.c}">${x.t}</span>`).join('');
     d.innerHTML=`<div class="pcard-top">
         <div class="pcard-rank">${i+1}</div>
-        ${avatarHtml(r.p)}
+        ${avatarHtml(r.p,'md')}
         <div class="pcard-info">${pcardInfoHtml(r.p,{nameExtra:queueStarHtml(r.p.id), chips})}</div>
       </div>
       <div class="pcard-actions"></div>`;
     d.querySelector('.pcard-info').onclick=()=>openPlayer(r.p.id);
     const actions=d.querySelector('.pcard-actions');
     actions.appendChild(starButton(r.p.id));
-    const b1=document.createElement('button'); b1.className='btn taken'; b1.textContent='Taken';
+    const b1=document.createElement('button'); b1.className='btn taken'; b1.style.height='44px'; b1.textContent='Taken';
     b1.onclick=()=>mark(r.p.id,'taken');
-    const b2=document.createElement('button'); b2.className='btn mine'; b2.textContent='Me';
+    const b2=document.createElement('button'); b2.className='btn mine'; b2.style.height='44px'; b2.textContent='Draft to my team';
     b2.onclick=()=>mark(r.p.id,'mine');
     actions.appendChild(b1); actions.appendChild(b2);
     el.appendChild(d);
   });
+}
+function renderBuddyLatest(){
+  const strip=$('buddyLatest'); if(!strip) return;
+  const lastReply=[...chatHistory].reverse().find(m=>m.role==='assistant' && m.content && !m.errored);
+  if(!lastReply){ strip.style.display='none'; return; }
+  strip.style.display='flex';
+  $('blText').textContent=lastReply.content.split('\n')[0].slice(0,140);
 }
 function renderBoard(){
   const el=$('board'); el.innerHTML='';
@@ -966,7 +976,7 @@ function renderAll(){
   const avail=S.queue.filter(id=>!status[id]).length;
   $('qCount').style.display = avail? 'inline-block':'none';
   $('qCount').textContent = avail;
-  if(t==='draft'){ renderRecs(); renderBoard(); }
+  if(t==='draft'){ renderRecs(); renderBuddyLatest(); renderBoard(); }
   if(t==='board') renderDraftBoard();
   if(t==='queue') renderQueue();
   if(t==='team') renderTeam();
@@ -1107,6 +1117,7 @@ async function sendChat(){
 }
 $('chatSend').onclick=sendChat;
 $('chatInput').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); } };
+$('blAsk').onclick=()=>{ S.ui.tab='buddy'; renderAll(); };
 /* ---------- save / load ---------- */
 function openExport(mode){
   const m=$('exModal'); m.classList.add('open');
