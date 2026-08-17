@@ -13,7 +13,7 @@
 <header>
   <div class="hbar">
     <div class="brand">
-      <span class="brand-mark">🏈</span>
+      <div class="brand-chip">DD</div>
       <div>
         <h1>Draft Day</h1>
         <div class="sub" id="subhdr" title="Tiers and positional rank are a curated consensus, manually compiled July 2026. ADP is live where Fantasy Football Calculator has real draft data, otherwise falls back to consensus. Injury/depth data is live.">2026 · PPR · curated ranks + live ADP</div>
@@ -21,6 +21,8 @@
       </div>
     </div>
     <div class="spacer"></div>
+    <button class="btn ghost" id="simBtn" style="display:none">Sim pick</button>
+    <button class="btn ghost" id="simToMineBtn" style="display:none">Sim to my pick</button>
     <button class="iconbtn" id="undoBtn" aria-label="Undo">↩</button>
     <button class="iconbtn" id="setBtn" aria-label="Settings">⚙</button>
   </div>
@@ -28,7 +30,7 @@
     <div class="stat"><div class="v" id="stRound">–</div><div class="l">Round</div></div>
     <div class="stat"><div class="v tap" id="stPick" title="Tap to correct pick #">–</div><div class="l">Overall pick</div></div>
     <div class="stat" id="stClockBox"><div class="v" id="stClock">–</div><div class="l" id="stClockLab">On the clock</div></div>
-    <div class="stat"><div class="v" id="stNext">–</div><div class="l">Your next</div></div>
+    <div class="stat"><div class="v" id="stNext">–</div><div class="l">Until your pick</div></div>
   </div>
   <div class="tabs-scroll" id="tabsScroll" style="display:none">
     <div class="tabs" id="tabs">

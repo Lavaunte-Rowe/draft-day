@@ -45,9 +45,12 @@
   /* header */
   header{position:sticky; top:0; z-index:50; background:rgba(19,20,31,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line);}
-  .hbar{display:flex; align-items:center; gap:10px; max-width:760px; margin:0 auto; padding:var(--sp-3) var(--sp-4);}
+  .hbar{display:flex; align-items:center; flex-wrap:wrap; gap:8px; max-width:760px; margin:0 auto; padding:var(--sp-3) var(--sp-4);}
   .brand{display:flex; align-items:center; gap:10px; min-width:0;}
   .brand-mark{font-size:24px; line-height:1; flex:none;}
+  .brand-chip{width:32px; height:32px; border-radius:8px; border:1px solid var(--accent-border); background:var(--panel);
+    display:flex; align-items:center; justify-content:center; color:var(--accent-text); font-size:12px; font-weight:600; flex:none;}
+  .hbar .btn.ghost{height:34px; padding:0 11px; border-radius:var(--r-sm); font-size:11px;}
   .hbar h1{font-size:var(--fs-title); margin:0; font-weight:600; letter-spacing:-.012em; color:var(--text);}
   .hbar .sub{font-size:var(--fs-meta); color:var(--dim); line-height:1.45;}
   .spacer{flex:1}

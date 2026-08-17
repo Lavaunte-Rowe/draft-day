@@ -337,7 +337,7 @@ function renderStatus(){
   $('stClock').textContent = done ? '—' : (mine ? 'YOU' : 'Team '+teamOnClock(S.pick));
   $('stClockLab').textContent = mine ? 'Your pick!' : 'On the clock';
   const nxt = nextMyPicks(1);
-  $('stNext').textContent = nxt.length? '#'+nxt[0] : '—';
+  $('stNext').textContent = !nxt.length ? '—' : (nxt[0]===S.pick ? 'Now' : nxt[0]-S.pick);
   $('subhdr').textContent = `${S.teams}-team PPR snake · slot ${S.slot} · Rd ${Math.min(roundOf(Math.min(S.pick,totalPicks())),S.rounds)}/${S.rounds}`;
 }
 function pcardInfoHtml(p, opts){
@@ -776,6 +776,23 @@ $('undoBtn').onclick=()=>{
   if(!a){ toast('Nothing to undo'); return; }
   S.pick=a.pick; rebuildStatus(); toast('Undone'); renderAll();
 };
+function simPick(){
+  if(S.pick>totalPicks()) return false;
+  const avail=PLAYERS.filter(p=>!status[p.id]).sort((a,b)=>a.adp-b.adp);
+  if(!avail.length) return false;
+  const pick=avail[Math.floor(Math.random()*Math.min(3,avail.length))];
+  mark(pick.id,'taken');
+  return true;
+}
+$('simBtn').onclick=()=>{ if(!simPick()) toast('Nothing left to sim'); };
+$('simToMineBtn').onclick=()=>{
+  const remaining=nextMyPicks(1);
+  if(!remaining.length){ toast('No picks left for your slot'); return; }
+  const n=remaining[0]-S.pick;
+  if(n<=0){ toast("You're already on the clock"); return; }
+  if(!confirm(`Simulate ${n} pick${n===1?'':'s'} up to your turn?`)) return;
+  while(teamOnClock(S.pick)!==S.slot && S.pick<=totalPicks()){ if(!simPick()) break; }
+};
 /* ---------- copy state for Claude ---------- */
 function buildClaudeText(){
   const {picks}=myRoster();
@@ -976,5 +993,6 @@ $('suStart').onclick=()=>{
 function showApp(){
   $('setupView').style.display='none';
   $('statusbar').style.display='flex'; $('tabsScroll').style.display='block'; $('bottombar').style.display='block';
+  $('simBtn').style.display=''; $('simToMineBtn').style.display='';
 }
 initCloudAuth();
