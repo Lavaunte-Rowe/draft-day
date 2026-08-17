@@ -369,3 +369,12 @@
     text-overflow:ellipsis; max-width:58px; color:var(--text);}
   .dbempty{color:var(--dim2); font-size:14px;}
   .dbempty.dbclock{background:var(--accent-tint2); color:var(--accent-text); font-weight:700; outline:1px dashed var(--accent-border); outline-offset:-1px;}
+  .dbempty.dbeditable{cursor:pointer; color:var(--dim); font-weight:700; transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);}
+  .dbempty.dbeditable:hover, .dbempty.dbeditable:active{background:var(--panel3); color:var(--accent-text);}
+  /* assign-pick sheet */
+  .asglist{max-height:50vh; overflow-y:auto; margin-top:10px;}
+  .asgrow{display:flex; align-items:center; gap:8px; padding:8px 6px; border-radius:var(--r-row); cursor:pointer;
+    transition:background var(--dur-fast) var(--ease);}
+  .asgrow:hover, .asgrow:active{background:var(--panel2);}
+  .asgname{flex:1; min-width:0; font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .asgmeta{font-size:11px; color:var(--dim); flex:none;}

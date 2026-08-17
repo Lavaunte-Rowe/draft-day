@@ -579,7 +579,16 @@ function openPlayer(id){
     btns.appendChild(bs); btns.appendChild(bc); btns.appendChild(b1); btns.appendChild(b2);
   } else {
     const a=S.actions.find(x=>x.id===id);
-    btns.innerHTML=`<div class="note" style="flex:1;text-align:center">${st==='mine'?'On your roster':'Drafted by '+teamLabel(teamOnClock(a.pick))} — pick #${a.pick}</div>`;
+    btns.innerHTML=`<div class="note" style="flex:1;text-align:center">${st==='mine'?'On your roster':'Drafted by '+teamLabel(teamOnClock(a.pick))} — pick #${a.pick}</div>
+      <button class="btn ghost" id="pdRemove" style="width:100%">✕ Remove from board</button>`;
+    $('pdRemove').onclick=()=>{
+      if(!confirm(`Remove ${p.n} from pick #${a.pick}? The cell opens up so you can reassign it.`)) return;
+      S.actions=S.actions.filter(x=>x.id!==id);
+      rebuildStatus();
+      $('pModal').classList.remove('open');
+      toast(`${p.n} removed — pick #${a.pick} is open`);
+      renderAll();
+    };
   }
   $('pModal').classList.add('open');
 }
@@ -790,12 +799,56 @@ function renderDraftBoard(){
           </div>`;
       } else {
         const isClock = pickNo===S.pick && S.pick<=totalPicks();
-        html+=`<div class="dbcell dbempty${mine?' dbmine':''}${isClock?' dbclock':''}">${isClock?'●':'·'}</div>`;
+        const isEditable = pickNo<S.pick;
+        html+=`<div class="dbcell dbempty${mine?' dbmine':''}${isClock?' dbclock':''}${isEditable?' dbeditable':''}"${isEditable?` data-pick="${pickNo}" title="Assign pick #${pickNo}"`:''}>${isClock?'●':(isEditable?'+':'·')}</div>`;
       }
     }
   }
   el.innerHTML=html;
   el.querySelectorAll('.dbpick').forEach(c=>{ c.onclick=()=>openPlayer(Number(c.dataset.id)); });
+  el.querySelectorAll('.dbeditable').forEach(c=>{ c.onclick=()=>openAssignPick(Number(c.dataset.pick)); });
+}
+function assignToPick(id, pickNo, kind){
+  if(status[id]) return;
+  S.actions.push({id, kind, pick:pickNo});
+  rebuildStatus();
+  const p=PLAYERS.find(x=>x.id===id);
+  toast(`${p.n} assigned to pick #${pickNo}`);
+  renderAll();
+}
+function openAssignPick(pickNo){
+  const r=roundOf(pickNo), team=teamOnClock(pickNo), mine=team===S.slot, kind=mine?'mine':'taken';
+  const sheet=$('pSheet');
+  const rowsHtml=(q)=>{
+    const ql=(q||'').toLowerCase();
+    const avail=PLAYERS.filter(p=>!status[p.id] && (!ql || p.n.toLowerCase().includes(ql) || p.t.toLowerCase().includes(ql))).slice(0,40);
+    if(!avail.length) return `<div class="note" style="text-align:center">No matching available players.</div>`;
+    return avail.map(p=>`<div class="asgrow" data-id="${p.id}">
+        ${avatarHtml(p,'sm')}
+        <span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>
+        <span class="asgname">${p.n}</span>
+        <span class="asgmeta">${p.t} · ADP ${p.adp}</span>
+      </div>`).join('');
+  };
+  const wireRows=()=>{
+    $('asgList').querySelectorAll('.asgrow').forEach(row=>{
+      row.onclick=()=>{ assignToPick(Number(row.dataset.id), pickNo, kind); $('pModal').classList.remove('open'); };
+    });
+  };
+  sheet.innerHTML=`<div class="pd-head">
+      <div style="flex:1">
+        <h3 style="margin:0">Assign pick #${pickNo}</h3>
+        <div class="pd-sub">Round ${r} · ${mine?'YOU':teamLabel(team)}</div>
+      </div>
+      <button class="iconbtn" id="pdClose">✕</button>
+    </div>
+    <input type="search" id="asgSearch" placeholder="Search player or team…" style="width:100%; margin-top:10px">
+    <div id="asgList" class="asglist"></div>`;
+  $('pdClose').onclick=()=>$('pModal').classList.remove('open');
+  $('asgList').innerHTML=rowsHtml('');
+  wireRows();
+  $('asgSearch').oninput=e=>{ $('asgList').innerHTML=rowsHtml(e.target.value); wireRows(); };
+  $('pModal').classList.add('open');
 }
 /* ---------- two-pane resizable shell ---------- */
 function applyPaneLayout(){
