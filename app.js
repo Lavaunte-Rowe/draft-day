@@ -5,6 +5,8 @@ let S = {
   pick:1,                    // current overall pick about to be made
   actions:[],                // [{id, kind:'taken'|'mine', pick}]
   queue:[],                  // starred player ids, in priority order
+  split:.5,                  // two-pane splitter fraction, clamped .22-.82
+  pane:null,                 // null (split) | 'main' | 'side' — maximized pane
   ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false}
 };
 const status = {};           // id -> 'taken' | 'mine'
@@ -83,6 +85,7 @@ function showAuthView(){
   $('setupView').style.display='none';
   $('statusbar').style.display='none'; $('tabsScroll').style.display='none';
   $('bottombar').style.display='none'; $('chatbar').style.display='none';
+  $('wrap').classList.remove('two-pane');
 }
 async function onSignedIn(user){
   cloudUser = user;
@@ -735,6 +738,79 @@ function renderDraftBoard(){
   el.innerHTML=html;
   el.querySelectorAll('.dbpick').forEach(c=>{ c.onclick=()=>openPlayer(Number(c.dataset.id)); });
 }
+/* ---------- two-pane resizable shell ---------- */
+function applyPaneLayout(){
+  const wrap=$('wrap');
+  document.querySelectorAll('.panebtns button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.pane===(S.pane||'split'));
+  });
+  if(S.pane==='main'){
+    wrap.style.gridTemplateColumns='1fr';
+    $('splitter').style.display='none';
+    $('sidebar').style.display='none';
+    $('mainPane').style.display='block';
+    $('mainPaneBtns').style.display='flex';
+  } else if(S.pane==='side'){
+    wrap.style.gridTemplateColumns='1fr';
+    $('splitter').style.display='none';
+    $('mainPane').style.display='none';
+    $('sidebar').style.display='flex';
+    $('mainPaneBtns').style.display='none';
+  } else {
+    wrap.style.gridTemplateColumns=`minmax(0, ${S.split}fr) 10px minmax(0, ${1-S.split}fr)`;
+    $('splitter').style.display='block';
+    $('mainPane').style.display='block';
+    $('sidebar').style.display='flex';
+    $('mainPaneBtns').style.display='none';
+  }
+}
+function setPane(mode){ S.pane = mode==='split' ? null : mode; applyPaneLayout(); scheduleCloudSave(); }
+document.querySelectorAll('.panebtns').forEach(el=>{
+  el.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; setPane(b.dataset.pane); };
+});
+(function(){
+  const splitter=$('splitter');
+  let dragging=false;
+  splitter.addEventListener('pointerdown', e=>{ dragging=true; splitter.setPointerCapture(e.pointerId); });
+  document.addEventListener('pointermove', e=>{
+    if(!dragging || S.pane) return;
+    const rect=$('wrap').getBoundingClientRect();
+    let frac=(e.clientX-rect.left)/rect.width;
+    frac=Math.max(.22, Math.min(.82, frac));
+    S.split=frac;
+    $('wrap').style.gridTemplateColumns=`minmax(0, ${S.split}fr) 10px minmax(0, ${1-S.split}fr)`;
+  });
+  document.addEventListener('pointerup', ()=>{ if(dragging){ dragging=false; scheduleCloudSave(); } });
+  splitter.addEventListener('dblclick', ()=>{ S.split=.5; applyPaneLayout(); scheduleCloudSave(); });
+})();
+/* ---------- sidebar: roster needs + tier watch, draft flow ---------- */
+function renderNeedsCard(){
+  const el=$('needsCard'); if(!el) return;
+  const {slots}=myRoster();
+  const pillsHtml=['QB','RB','WR','TE','K','DST'].map(pos=>{
+    const total=slots.filter(s=>s.pos===pos).length;
+    if(!total) return '';
+    const filled=slots.filter(s=>s.pos===pos && s.pl).length;
+    const short=total-filled;
+    const cls = short<=0 ? 'ok' : (short===1 ? 'warn' : 'bad');
+    return `<span class="needpill ${cls}">${pos} ${filled}/${total}</span>`;
+  }).join('');
+  const tierRows=['RB','WR','TE','QB'].map(pos=>{
+    const avail=PLAYERS.filter(p=>p.p===pos && !status[p.id]).sort((a,b)=>tiers[a.id]-tiers[b.id] || a.adp-b.adp);
+    if(!avail.length) return '';
+    const top=avail[0], tierNum=tiers[top.id];
+    const count=avail.filter(p=>tiers[p.id]===tierNum).length;
+    const scarcity = count<=2?'bad':(count<=4?'warn':'ok');
+    return `<div class="tierrow"><span class="posbadge ${posColor(pos)}">${pos}</span><span class="tiertxt">Tier ${tierNum} — ${top.n}</span><span class="tiercount ${scarcity}">${count}</span></div>`;
+  }).join('');
+  el.innerHTML=`<h3>Roster needs</h3><div class="needpills">${pillsHtml}</div>
+    <h3 class="tight">Tier watch</h3><div class="tierrows">${tierRows}</div>`;
+}
+function renderFlowCard(){
+  const el=$('flowCard'); if(!el) return;
+  const nxt=nextMyPicks(3).map(x=>'#'+x).join(', ')||'none left';
+  el.innerHTML=`<h3>Draft flow</h3><div class="flowtxt">${S.actions.length} of ${totalPicks()} picks logged. You hold slot ${S.slot}, so your picks run ${nxt}, and on down the snake.</div>`;
+}
 function renderAll(){
   renderStatus();
   const t=S.ui.tab;
@@ -758,6 +834,7 @@ function renderAll(){
   if(t==='log') renderLog();
   if(t==='notes') renderNotes();
   if(t==='buddy') renderChat();
+  if(S.started){ applyPaneLayout(); renderNeedsCard(); renderFlowCard(); }
   scheduleCloudSave();
 }
 /* ---------- actions ---------- */
@@ -954,11 +1031,13 @@ $('mSave').onclick=()=>{
   S.pick=Math.max(1,Math.min(totalPicks()+1,Number($('mPick').value)||1));
   $('setModal').classList.remove('open'); renderAll(); toast('Settings saved');
 };
-$('mReset').onclick=()=>{
+function resetDraft(){
   if(!confirm('Reset the whole draft? All picks will be cleared.')) return;
   S.actions=[]; S.pick=1; rebuildStatus();
-  $('setModal').classList.remove('open'); renderAll(); toast('Draft reset');
-};
+  renderAll(); toast('Draft reset');
+}
+$('mReset').onclick=()=>{ resetDraft(); $('setModal').classList.remove('open'); };
+$('sideResetBtn').onclick=resetDraft;
 $('stPick').onclick=()=>{
   const v=prompt('Set current overall pick number (use this if the app got out of sync with the real draft):', S.pick);
   if(v==null) return; const n=Number(v);
@@ -994,5 +1073,6 @@ function showApp(){
   $('setupView').style.display='none';
   $('statusbar').style.display='flex'; $('tabsScroll').style.display='block'; $('bottombar').style.display='block';
   $('simBtn').style.display=''; $('simToMineBtn').style.display='';
+  $('wrap').classList.add('two-pane');
 }
 initCloudAuth();

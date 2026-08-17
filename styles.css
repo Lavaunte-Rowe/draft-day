@@ -33,6 +33,40 @@
   :focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   ::selection{background:rgba(145,132,217,.3);}
   .wrap{max-width:760px; margin:0 auto; padding:var(--sp-4) 10px 90px;}
+  .wrap.two-pane{max-width:1180px; display:grid; gap:var(--sp-3-5); align-items:start;
+    grid-template-columns:minmax(0,.5fr) 10px minmax(0,.5fr);}
+  .main-pane{grid-column:1; min-width:0;}
+  .splitter{grid-column:2; align-self:stretch; position:relative; cursor:col-resize; touch-action:none;}
+  .splitter::before{content:''; position:absolute; top:50%; left:50%; width:2px; height:44px;
+    transform:translate(-50%,-50%); background:var(--line2); border-radius:2px;}
+  .sidebar{grid-column:3; min-width:0; display:flex; flex-direction:column; gap:var(--sp-3);}
+  .panebtns{order:-1; display:flex; gap:6px;}
+  .panebtns button{height:26px; padding:0 9px; border-radius:var(--r-chip); border:1px solid var(--line);
+    background:transparent; color:var(--dim); font-size:11px; font-weight:600;}
+  .panebtns button.active{border-color:var(--line3); background:var(--panel3); color:var(--text);}
+  .sidebar .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--sp-3);}
+  .sidebar .card h3{font-size:var(--fs-label); text-transform:uppercase; letter-spacing:.09em; color:var(--dim);
+    margin:0 0 10px; font-weight:600;}
+  .sidebar .card h3.tight{margin-top:12px;}
+  .needpill{display:inline-block; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:var(--r-pill);
+    margin:0 4px 4px 0; border:1px solid var(--line); color:var(--dim);}
+  .needpill.ok{color:var(--pos-text); border-color:var(--pos-border); background:var(--pos-bg);}
+  .needpill.warn{color:var(--warn); border-color:#e0a52c55; background:#e0a52c12;}
+  .needpill.bad{color:var(--neg-text); border-color:var(--neg-border); background:var(--neg-bg);}
+  .tierrow{display:flex; align-items:center; gap:6px; padding:5px 0; border-top:1px solid var(--line); font-size:12px;}
+  .tierrow:first-child{border-top:none; padding-top:0;}
+  .tiertxt{flex:1; min-width:0; color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .tiercount{font-weight:700; font-size:11px;}
+  .tiercount.ok{color:var(--pos-text);} .tiercount.warn{color:var(--warn);} .tiercount.bad{color:var(--neg-text);}
+  .flowtxt{font-size:12.5px; color:var(--text2); line-height:1.5;}
+  .btn.sidebtn-reset{width:100%; height:40px; background:transparent; color:var(--neg-text); border:1px solid var(--neg-border);}
+  @media (max-width:860px){
+    .wrap.two-pane{display:block; max-width:760px;}
+    .splitter{display:none!important;}
+    .panebtns{display:none!important;}
+    .sidebar{display:block!important; margin-top:var(--sp-3-5);}
+    .main-pane{display:block!important;}
+  }
   @keyframes viewIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
   #draftView, #boardView, #queueView, #teamView, #logView, #notesView, #authView{ animation:viewIn var(--dur-med) var(--ease); }
   /* shared utility keyframes — referenced by class name in later phases */

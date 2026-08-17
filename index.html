@@ -44,7 +44,7 @@
     </div>
   </div>
 </header>
-<div class="wrap">
+<div class="wrap" id="wrap">
   <!-- AUTH -->
   <div id="authView" class="setup" style="display:none">
     <h2 id="authTitle">Sign in</h2>
@@ -75,6 +75,11 @@
     <div class="reqgrid" id="suReq"></div>
     <div class="sheetbtns"><button class="btn primary" id="suStart" style="font-size:15px">Start draft</button></div>
     <div class="note">Player pool: 300 players. Tier &amp; positional rank are a <b>curated consensus, manually compiled July 2026</b>. ADP updates live daily from real drafts (Fantasy Football Calculator) where available, otherwise falls back to the curated number. Injury status and depth chart come from live data. Tap <b>Taken</b> when anyone else drafts a player, <b>Me</b> when you draft. The board and advice update every pick.</div>
+  </div>
+  <!-- MAIN PANE -->
+  <div class="main-pane" id="mainPane">
+  <div class="panebtns" id="mainPaneBtns" style="display:none">
+    <button data-pane="main">Left</button><button data-pane="split">Split</button><button data-pane="side">Right</button>
   </div>
   <!-- DRAFT TAB -->
   <div id="draftView" style="display:none">
@@ -135,6 +140,18 @@
       <div class="note" style="margin:0 2px 10px">Chat live about your draft — Buddy sees your full board, roster, and queue.</div>
       <div class="chat-messages" id="chatMessages"></div>
     </section>
+  </div>
+  </div>
+  <!-- SPLITTER -->
+  <div class="splitter" id="splitter" style="display:none"></div>
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar" style="display:none">
+    <div class="panebtns" id="sidebarPaneBtns">
+      <button data-pane="main">Left</button><button data-pane="split">Split</button><button data-pane="side">Right</button>
+    </div>
+    <div class="card" id="needsCard"></div>
+    <div class="card" id="flowCard"></div>
+    <button class="btn sidebtn-reset" id="sideResetBtn">Reset draft</button>
   </div>
 </div>
 <div class="chatbar" id="chatbar" style="display:none">
