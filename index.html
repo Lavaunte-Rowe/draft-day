@@ -127,7 +127,22 @@
   </div>
   <!-- LOG TAB -->
   <div id="logView" style="display:none">
-    <section><h2>Draft log</h2><div id="log"></div></section>
+    <section>
+      <div class="loghead">
+        <h2 style="margin:0">Draft log</h2>
+        <div class="logsort">
+          <button class="btn ghost logsortbtn active" id="logSortDesc">Newest first</button>
+          <button class="btn ghost logsortbtn" id="logSortAsc">Oldest first</button>
+        </div>
+        <button class="btn ghost" id="logExport">Export / share</button>
+      </div>
+      <div class="controls">
+        <input type="search" id="logSearch" placeholder="Search name, team, position…">
+        <select id="logTeamFilter"></select>
+      </div>
+      <div class="pfilters" id="logPosFilters"></div>
+      <div id="log"></div>
+    </section>
   </div>
   <!-- BUDDY CHAT TAB -->
   <div id="buddyView" style="display:none">

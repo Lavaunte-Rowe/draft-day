@@ -9,7 +9,8 @@ let S = {
   pane:null,                 // null (split) | 'main' | 'side' — maximized pane
   notes:[],                  // [{id, text, pinned, stamp}]
   sideOrder:['needs','flow','reset','trend','notes'],
-  ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false}
+  ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false,
+    logSort:'desc', logQ:'', logPos:'ALL', logTeam:'ALL'}
 };
 const status = {};           // id -> 'taken' | 'mine'
 /* ---------- sleeper enrichment (live injury/depth data + photo ids) ---------- */
@@ -701,23 +702,56 @@ function renderTeam(){
     ? 'Still need starters: '+Object.entries(need).map(([k,v])=>`${k}×${v}`).join(', ')
     : 'All starting slots filled — building bench depth now.';
 }
+function rebuildLogTeamFilter(){
+  const sel=$('logTeamFilter');
+  const cur=sel.value || S.ui.logTeam;
+  sel.innerHTML=`<option value="ALL">All teams</option><option value="MINE">My picks</option>`
+    + Array.from({length:S.teams},(_, i)=>`<option value="${i+1}">Team ${i+1}</option>`).join('');
+  sel.value = [...sel.options].some(o=>o.value===cur) ? cur : 'ALL';
+  S.ui.logTeam = sel.value;
+}
 function renderLog(){
-  const el=$('log'); el.innerHTML='';
-  [...S.actions].reverse().forEach(a=>{
+  const el=$('log');
+  rebuildLogTeamFilter();
+  let list=[...S.actions];
+  if(S.ui.logSort==='desc') list.reverse();
+  const q=(S.ui.logQ||'').toLowerCase();
+  list=list.filter(a=>{
     const p=PLAYERS.find(x=>x.id===a.id);
-    const d=document.createElement('div'); d.className='logrow';
+    if(S.ui.logPos!=='ALL' && p.p!==S.ui.logPos) return false;
+    if(S.ui.logTeam==='MINE'){ if(a.kind!=='mine') return false; }
+    else if(S.ui.logTeam!=='ALL' && teamOnClock(a.pick)!==Number(S.ui.logTeam)) return false;
+    if(q && !(p.n.toLowerCase().includes(q) || p.t.toLowerCase().includes(q) || p.p.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  el.innerHTML='';
+  if(!S.actions.length){
+    el.innerHTML=`<div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">No picks yet</div>
+        <div class="empty-sub">Every pick will show up here as the draft goes.</div>
+      </div>`;
+    return;
+  }
+  if(!list.length){
+    el.innerHTML=`<div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">No picks match these filters</div>
+        <div class="empty-sub">Try clearing the search, position, or team filter.</div>
+      </div>`;
+    return;
+  }
+  list.forEach(a=>{
+    const p=PLAYERS.find(x=>x.id===a.id);
+    const d=document.createElement('div'); d.className='logrow'+(a.kind==='mine'?' mine':'');
     d.innerHTML=`<div class="logpick">#${a.pick} R${roundOf(a.pick)}</div>
       ${avatarHtml(p,'sm')}
       <span class="posbadge ${posColor(p.p)}">${p.p}</span>
       <div style="flex:1; min-width:0">${p.n}${injuryBadgeHtml(p.id)} <span style="color:var(--dim);font-size:12px">${teamLogoHtml(p.t)}${p.t}</span></div>
       <div style="font-size:11px;font-weight:800;color:${a.kind==='mine'?'var(--me)':'var(--dim)'}">${a.kind==='mine'?'YOU':'Team '+teamOnClock(a.pick)}</div>`;
+    d.onclick=()=>openPlayer(a.id);
     el.appendChild(d);
   });
-  if(!S.actions.length) el.innerHTML=`<div class="empty-state">
-      <div class="empty-icon">📋</div>
-      <div class="empty-title">No picks yet</div>
-      <div class="empty-sub">Every pick will show up here as the draft goes.</div>
-    </div>`;
 }
 function renderDraftBoard(){
   const el=$('dbGrid');
@@ -1207,6 +1241,23 @@ $('showMore').onclick=()=>{ S.ui.shown+=50; renderBoard(); };
     el.appendChild(b);
   }
 })();
+/* ---------- draft log filters ---------- */
+(function(){
+  const el=$('logPosFilters');
+  for(const pos of ['ALL','RB','WR','QB','TE','K','DST']){
+    const b=document.createElement('button'); b.className='pf'+(pos==='ALL'?' active':''); b.textContent=pos;
+    b.onclick=()=>{ S.ui.logPos=pos;
+      el.querySelectorAll('.pf').forEach(x=>x.classList.toggle('active',x===b)); renderLog(); };
+    el.appendChild(b);
+  }
+})();
+$('logSearch').oninput=e=>{ S.ui.logQ=e.target.value; renderLog(); };
+$('logTeamFilter').onchange=e=>{ S.ui.logTeam=e.target.value; renderLog(); };
+$('logSortDesc').onclick=()=>{ S.ui.logSort='desc';
+  $('logSortDesc').classList.add('active'); $('logSortAsc').classList.remove('active'); renderLog(); };
+$('logSortAsc').onclick=()=>{ S.ui.logSort='asc';
+  $('logSortAsc').classList.add('active'); $('logSortDesc').classList.remove('active'); renderLog(); };
+$('logExport').onclick=()=>openExport('claude');
 /* ---------- setup screen ---------- */
 fillSelect($('suTeams'),4,20,10); fillSelect($('suSlot'),1,10,5); fillSelect($('suRounds'),8,25,15);
 $('suTeams').onchange=()=>fillSelect($('suSlot'),1,Number($('suTeams').value),1);
