@@ -67,6 +67,34 @@
     .sidebar{display:block!important; margin-top:var(--sp-3-5);}
     .main-pane{display:block!important;}
   }
+  /* sidebar drag-reorder */
+  .sidecard{cursor:grab;}
+  .sidecard:active{cursor:grabbing;}
+  .sidecard.dragging{opacity:.4;}
+  .sidecard.runactive .card{border-color:var(--runcolor, var(--line));}
+  /* trend chart */
+  .trendbadge{display:inline-block; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:var(--r-pill);
+    background:var(--panel2); color:var(--text2); margin-left:6px; vertical-align:1px;}
+  .trendchart{display:flex; align-items:flex-end; gap:5px; height:90px; margin:6px 0;}
+  .trendbar-col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; min-width:0;}
+  .trendbar{width:100%; min-height:16px; border-radius:4px 4px 0 0; display:flex; align-items:flex-end; justify-content:center;
+    position:relative; transition:height var(--dur-med) var(--ease);}
+  .trendbar-lab{font-size:8px; font-weight:700; color:#0d1117; padding-bottom:2px; white-space:nowrap; overflow:hidden;
+    max-width:100%; text-overflow:ellipsis;}
+  .trendbar-rd{font-size:9px; color:var(--dim); margin-top:3px;}
+  /* notes card */
+  .noteadd{display:flex; gap:6px; margin-bottom:8px;}
+  .noteadd input{flex:1; font-size:12.5px; padding:7px 9px;}
+  .noterow{display:flex; align-items:center; gap:6px; padding:7px 0; border-top:1px solid var(--line); font-size:12.5px;}
+  .noterow:first-child{border-top:none; padding-top:0;}
+  .noterow.pinned{background:var(--pin-bg); border-color:var(--pin-border); margin:0 -12px; padding:7px 12px; border-top:1px solid var(--pin-border);}
+  .notepin{background:transparent; border:none; color:var(--dim); font-size:13px; padding:0; flex:none; width:18px;}
+  .noterow.pinned .notepin{color:var(--queue);}
+  .notetext{flex:1; min-width:0; color:var(--text2); cursor:text; overflow-wrap:break-word;}
+  .noteeditinput{flex:1; min-width:0; font-size:12.5px; padding:4px 6px;}
+  .notestamp{font-size:9.5px; color:var(--dim); flex:none;}
+  .noteedit,.notedel{background:transparent; border:none; color:var(--dim); font-size:13px; padding:0 2px; flex:none;}
+  .notedel:hover{color:var(--neg-text);}
   @keyframes viewIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
   #draftView, #boardView, #queueView, #teamView, #logView, #notesView, #authView{ animation:viewIn var(--dur-med) var(--ease); }
   /* shared utility keyframes — referenced by class name in later phases */

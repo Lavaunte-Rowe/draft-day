@@ -7,6 +7,8 @@ let S = {
   queue:[],                  // starred player ids, in priority order
   split:.5,                  // two-pane splitter fraction, clamped .22-.82
   pane:null,                 // null (split) | 'main' | 'side' — maximized pane
+  notes:[],                  // [{id, text, pinned, stamp}]
+  sideOrder:['needs','flow','reset','trend','notes'],
   ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false}
 };
 const status = {};           // id -> 'taken' | 'mine'
@@ -48,7 +50,6 @@ const cloudConfigured = typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && !
 const sb = cloudConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let cloudUser = null;
 let cloudReady = false;   // true once the initial cloud load/restore attempt has finished
-let notesText = '';
 let saveTimer = null;
 function scheduleCloudSave(){
   if(!sb || !cloudUser || !cloudReady) return;
@@ -61,7 +62,6 @@ async function saveToCloud(){
     await sb.from('app_state').upsert({
       user_id: cloudUser.id,
       draft_state: {...S, ui:undefined},
-      notes: notesText,
       updated_at: new Date().toISOString(),
     });
   }catch(e){ console.warn('Cloud save failed', e); }
@@ -76,7 +76,11 @@ async function loadFromCloud(){
         S = {...S, ...data.draft_state, ui:S.ui};
         rebuildStatus();
       }
-      notesText = data.notes || '';
+      // one-time migration: fold any legacy freeform-text note into the new structured list
+      if((!S.notes || !S.notes.length) && data.notes){
+        S.notes=[{id:'legacy', text:data.notes, pinned:false, stamp:'—'}];
+      }
+      if(!S.sideOrder || !S.sideOrder.length) S.sideOrder=['needs','flow','reset','trend','notes'];
     }
   }catch(e){ console.warn('Cloud load failed', e); }
 }
@@ -705,10 +709,6 @@ function renderLog(){
       <div class="empty-sub">Every pick will show up here as the draft goes.</div>
     </div>`;
 }
-function renderNotes(){
-  const ta=$('notesText');
-  if(document.activeElement!==ta) ta.value=notesText;
-}
 function renderDraftBoard(){
   const el=$('dbGrid');
   el.style.gridTemplateColumns=`34px repeat(${S.teams},1fr)`;
@@ -741,6 +741,7 @@ function renderDraftBoard(){
 /* ---------- two-pane resizable shell ---------- */
 function applyPaneLayout(){
   const wrap=$('wrap');
+  applySideOrder();
   document.querySelectorAll('.panebtns button').forEach(b=>{
     b.classList.toggle('active', b.dataset.pane===(S.pane||'split'));
   });
@@ -811,6 +812,145 @@ function renderFlowCard(){
   const nxt=nextMyPicks(3).map(x=>'#'+x).join(', ')||'none left';
   el.innerHTML=`<h3>Draft flow</h3><div class="flowtxt">${S.actions.length} of ${totalPicks()} picks logged. You hold slot ${S.slot}, so your picks run ${nxt}, and on down the snake.</div>`;
 }
+/* ---------- sidebar: positional trend ---------- */
+function computeTrend(){
+  const roundNums=[...new Set(S.actions.map(a=>roundOf(a.pick)))].sort((a,b)=>a-b);
+  const rounds=roundNums.map(r=>{
+    const picksInRound=S.actions.filter(a=>roundOf(a.pick)===r);
+    const counts={};
+    for(const a of picksInRound){ const p=PLAYERS.find(x=>x.id===a.id); counts[p.p]=(counts[p.p]||0)+1; }
+    const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+    return {r, pos:top[0], count:top[1], total:picksInRound.length};
+  });
+  let run=0, runPos=null;
+  if(S.actions.length){
+    runPos=PLAYERS.find(x=>x.id===S.actions[S.actions.length-1].id).p;
+    for(let i=S.actions.length-1;i>=0;i--){
+      const p=PLAYERS.find(x=>x.id===S.actions[i].id).p;
+      if(p===runPos) run++; else break;
+    }
+  }
+  return {rounds, run, runPos, hasRun: run>=3};
+}
+function renderTrendCard(){
+  const el=$('trendCard'); if(!el) return;
+  const wrapper=el.closest('.sidecard');
+  if(!S.actions.length){
+    el.innerHTML=`<h3>Trend</h3><div class="note" style="margin:0">Position mix appears once picks are logged.</div>`;
+    if(wrapper) wrapper.classList.remove('runactive');
+    return;
+  }
+  const {rounds, run, runPos, hasRun}=computeTrend();
+  const maxCount=Math.max(...rounds.map(r=>r.total), 1);
+  const barsHtml=rounds.map(r=>{
+    const pct=Math.max(18, Math.round((r.count/maxCount)*100));
+    return `<div class="trendbar-col">
+        <div class="trendbar" style="height:${pct}%; background:var(--${r.pos.toLowerCase()})">
+          <span class="trendbar-lab">${r.pos} ${r.count}/${r.total}</span>
+        </div>
+        <div class="trendbar-rd">Rd ${r.r}</div>
+      </div>`;
+  }).join('');
+  const recentTxt=`Last ${Math.min(10,S.actions.length)} picks: `+S.actions.slice(-10).map(a=>PLAYERS.find(p=>p.id===a.id).p).join(', ');
+  const badge=hasRun?`<span class="trendbadge dd-pulse">${runPos} run · ${run} straight</span>`:'';
+  el.innerHTML=`<h3>Trend${badge}</h3>
+    <div class="note" style="margin:0 0 8px">Most-drafted position each round, and how much of the round it took.</div>
+    <div class="trendchart">${barsHtml}</div>
+    <div class="note" style="margin-top:6px">${recentTxt}</div>`;
+  if(wrapper){
+    wrapper.classList.toggle('runactive', hasRun);
+    if(hasRun) wrapper.style.setProperty('--runcolor', `var(--${runPos.toLowerCase()})`);
+  }
+}
+/* ---------- sidebar: notes ---------- */
+function addNote(){
+  const input=$('noteInput'); if(!input) return;
+  const text=input.value.trim(); if(!text) return;
+  const stamp = S.started ? `R${roundOf(S.pick)}·#${S.pick}` : '—';
+  S.notes=S.notes||[];
+  S.notes.push({id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())), text, pinned:false, stamp});
+  input.value='';
+  renderNotesCard(); scheduleCloudSave();
+}
+function toggleNotePin(id){
+  const n=(S.notes||[]).find(x=>x.id===id); if(!n) return;
+  n.pinned=!n.pinned; renderNotesCard(); scheduleCloudSave();
+}
+function deleteNote(id){
+  S.notes=(S.notes||[]).filter(x=>x.id!==id);
+  renderNotesCard(); scheduleCloudSave();
+}
+function startEditNote(id){
+  const row=document.querySelector(`.noterow[data-id="${id}"]`);
+  const n=(S.notes||[]).find(x=>x.id===id);
+  if(!row||!n) return;
+  const textDiv=row.querySelector('.notetext'); if(!textDiv) return;
+  textDiv.outerHTML=`<input type="text" class="noteeditinput" draggable="false">`;
+  const input=row.querySelector('.noteeditinput');
+  input.value=n.text; input.focus(); input.select();
+  let done=false;
+  const save=()=>{ if(done) return; done=true; n.text=input.value.trim()||n.text; renderNotesCard(); scheduleCloudSave(); };
+  input.onkeydown=e=>{
+    if(e.key==='Enter'){ e.preventDefault(); save(); }
+    else if(e.key==='Escape'){ e.preventDefault(); done=true; renderNotesCard(); }
+  };
+  input.onblur=save;
+}
+function renderNotesCard(){
+  const el=$('notesCard'); if(!el) return;
+  const notes=[...(S.notes||[])].sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
+  const countHtml = notes.length ? `<span class="qcount">${notes.length}</span>` : '';
+  const rowsHtml = notes.length ? notes.map(n=>`
+    <div class="noterow${n.pinned?' pinned':''}" data-id="${n.id}">
+      <button class="notepin" data-act="pin" title="Pin">${n.pinned?'★':'☆'}</button>
+      <div class="notetext" data-act="edit">${escapeHtml(n.text)}</div>
+      <span class="notestamp">${n.stamp}</span>
+      <button class="noteedit" data-act="edit" title="Edit">✎</button>
+      <button class="notedel" data-act="del" title="Delete">×</button>
+    </div>`).join('') : `<div class="note" style="margin:0">No notes yet.</div>`;
+  el.innerHTML=`<h3>Notes ${countHtml}</h3>
+    <div class="noteadd"><input type="text" id="noteInput" draggable="false" placeholder="Add a note…"><button class="btn ghost" id="noteAddBtn">Add</button></div>
+    <div class="noterows">${rowsHtml}</div>`;
+  $('noteInput').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); addNote(); } };
+  $('noteAddBtn').onclick=addNote;
+  el.querySelectorAll('.noterow').forEach(row=>{
+    const id=row.dataset.id;
+    row.querySelector('[data-act="pin"]').onclick=()=>toggleNotePin(id);
+    row.querySelector('.notedel').onclick=()=>deleteNote(id);
+    row.querySelectorAll('[data-act="edit"]').forEach(x=>x.onclick=()=>startEditNote(id));
+  });
+}
+/* ---------- sidebar: drag-to-reorder ---------- */
+function applySideOrder(){
+  const order = (S.sideOrder && S.sideOrder.length) ? S.sideOrder : ['needs','flow','reset','trend','notes'];
+  order.forEach((key,i)=>{
+    const el=document.querySelector(`.sidecard[data-key="${key}"]`);
+    if(el) el.style.order=i;
+  });
+}
+(function wireSidebarDrag(){
+  document.querySelectorAll('.sidecard').forEach(el=>{
+    el.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/plain', el.dataset.key);
+      e.dataTransfer.effectAllowed='move';
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', ()=>el.classList.remove('dragging'));
+    el.addEventListener('dragover', e=>e.preventDefault());
+    el.addEventListener('drop', e=>{
+      e.preventDefault();
+      const draggedKey=e.dataTransfer.getData('text/plain');
+      const targetKey=el.dataset.key;
+      if(!draggedKey || draggedKey===targetKey) return;
+      const order=S.sideOrder||['needs','flow','reset','trend','notes'];
+      const from=order.indexOf(draggedKey), to=order.indexOf(targetKey);
+      if(from<0||to<0) return;
+      order.splice(from,1); order.splice(to,0,draggedKey);
+      S.sideOrder=order;
+      applySideOrder(); scheduleCloudSave();
+    });
+  });
+})();
 function renderAll(){
   renderStatus();
   const t=S.ui.tab;
@@ -819,7 +959,6 @@ function renderAll(){
   $('queueView').style.display = t==='queue'?'block':'none';
   $('teamView').style.display = t==='team'?'block':'none';
   $('logView').style.display = t==='log'?'block':'none';
-  $('notesView').style.display = t==='notes'?'block':'none';
   $('buddyView').style.display = t==='buddy'?'block':'none';
   $('bottombar').style.display = (S.started && t!=='buddy') ? 'block':'none';
   $('chatbar').style.display = (S.started && t==='buddy') ? 'block':'none';
@@ -832,9 +971,8 @@ function renderAll(){
   if(t==='queue') renderQueue();
   if(t==='team') renderTeam();
   if(t==='log') renderLog();
-  if(t==='notes') renderNotes();
   if(t==='buddy') renderChat();
-  if(S.started){ applyPaneLayout(); renderNeedsCard(); renderFlowCard(); }
+  if(S.started){ applyPaneLayout(); renderNeedsCard(); renderFlowCard(); renderTrendCard(); renderNotesCard(); }
   scheduleCloudSave();
 }
 /* ---------- actions ---------- */
@@ -1045,7 +1183,6 @@ $('stPick').onclick=()=>{
 };
 /* ---------- ui wiring ---------- */
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ S.ui.tab=b.dataset.tab; renderAll(); });
-$('notesText').oninput=e=>{ notesText=e.target.value; scheduleCloudSave(); };
 $('search').oninput=e=>{ S.ui.search=e.target.value; S.ui.shown=50; renderBoard(); };
 $('toggleDrafted').onclick=()=>{ S.ui.hideDrafted=!S.ui.hideDrafted;
   $('toggleDrafted').textContent=S.ui.hideDrafted?'Hide drafted':'Show all'; renderBoard(); };

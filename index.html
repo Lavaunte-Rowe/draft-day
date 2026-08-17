@@ -39,7 +39,6 @@
       <button class="tab" data-tab="queue">Queue <span id="qCount" class="qcount" style="display:none">0</span></button>
       <button class="tab" data-tab="team">My team</button>
       <button class="tab" data-tab="log">Log</button>
-      <button class="tab" data-tab="notes">📝 Notes</button>
       <button class="tab" data-tab="buddy">🏈 Buddy</button>
     </div>
   </div>
@@ -125,14 +124,6 @@
   <div id="logView" style="display:none">
     <section><h2>Draft log</h2><div id="log"></div></section>
   </div>
-  <!-- NOTES TAB -->
-  <div id="notesView" style="display:none">
-    <section>
-      <h2>📝 Draft notes</h2>
-      <div class="note" style="margin:0 2px 10px">Freeform notes — strategy reminders, sleepers, anything. Autosaves to your account.</div>
-      <textarea id="notesText" class="export" style="height:360px" placeholder="Jot notes here…"></textarea>
-    </section>
-  </div>
   <!-- BUDDY CHAT TAB -->
   <div id="buddyView" style="display:none">
     <section>
@@ -149,9 +140,11 @@
     <div class="panebtns" id="sidebarPaneBtns">
       <button data-pane="main">Left</button><button data-pane="split">Split</button><button data-pane="side">Right</button>
     </div>
-    <div class="card" id="needsCard"></div>
-    <div class="card" id="flowCard"></div>
-    <button class="btn sidebtn-reset" id="sideResetBtn">Reset draft</button>
+    <div class="sidecard" data-key="needs" draggable="true"><div class="card" id="needsCard"></div></div>
+    <div class="sidecard" data-key="flow" draggable="true"><div class="card" id="flowCard"></div></div>
+    <div class="sidecard" data-key="reset" draggable="true"><button class="btn sidebtn-reset" id="sideResetBtn">Reset draft</button></div>
+    <div class="sidecard" data-key="trend" draggable="true"><div class="card" id="trendCard"></div></div>
+    <div class="sidecard" data-key="notes" draggable="true"><div class="card" id="notesCard"></div></div>
   </div>
 </div>
 <div class="chatbar" id="chatbar" style="display:none">
