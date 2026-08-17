@@ -515,12 +515,34 @@ function renderQueue(){
   $('clearGone').style.display = anyGone ? 'block':'none';
 }
 $('clearGone').onclick=()=>{ S.queue=S.queue.filter(id=>!status[id]); renderAll(); };
+function projRowsFor(pos, pr){
+  const n=v=>v==null?null:Math.round(v);
+  if(pos==='QB') return [['Pass yds',n(pr.pass_yd)],['Pass TD',n(pr.pass_td)],['INT',n(pr.pass_int)],['Rush yds',n(pr.rush_yd)],['Rush TD',n(pr.rush_td)]];
+  if(pos==='RB') return [['Carries',n(pr.rush_att)],['Rush yds',n(pr.rush_yd)],['Rush TD',n(pr.rush_td)],['Rec',n(pr.rec)],['Rec yds',n(pr.rec_yd)],['Rec TD',n(pr.rec_td)]];
+  if(pos==='WR'||pos==='TE') return [['Rec',n(pr.rec)],['Rec yds',n(pr.rec_yd)],['Rec TD',n(pr.rec_td)]];
+  if(pos==='DST') return [['Sacks',n(pr.sack)],['INT',n(pr.int)],['Fum rec',n(pr.fum_rec)]];
+  return [];
+}
 function openPlayer(id){
   const p=PLAYERS.find(x=>x.id===id);
   const st=status[id]; const s=STATS[String(id)];
   const e=ENRICH[id];
   const sheet=$('pSheet');
   const bye=p.b?`Bye ${p.b}`:'Free agent';
+  let projHtml='';
+  if(e && e.proj && typeof e.proj.pts_ppr==='number'){
+    const pr=e.proj;
+    const ppg = pr.gp ? (pr.pts_ppr/pr.gp).toFixed(1) : '—';
+    const rows = projRowsFor(p.p, pr).filter(r=>r[1]!=null);
+    projHtml=`<h2 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:16px 2px 6px">2026 projection (PPR)</h2>
+      <div class="note" style="margin:0 2px 6px">Season-long model projection, via Rotowire — refreshed daily.</div>
+      <div class="pd-facts" style="grid-template-columns:repeat(3,1fr); margin:8px 0 0">
+        <div class="fact"><div class="v">${pr.pts_ppr.toFixed(1)}</div><div class="l">Proj. pts</div></div>
+        <div class="fact"><div class="v">${ppg}</div><div class="l">Pts / game</div></div>
+        <div class="fact"><div class="v">${pr.gp!=null?Math.round(pr.gp):'—'}</div><div class="l">Games</div></div>
+      </div>
+      ${rows.length?`<div class="pd-stats">${rows.map(r=>`<div class="fact"><div class="v">${r[1].toLocaleString()}</div><div class="l">${r[0]}</div></div>`).join('')}</div>`:''}`;
+  }
   let statsHtml;
   if(s){
     const fppg=(s.fp/s.g).toFixed(1);
@@ -560,6 +582,7 @@ function openPlayer(id){
       <div class="fact"><div class="v">${p.b||'—'}</div><div class="l">Bye</div></div>
     </div>
     ${injuryHtml}
+    ${projHtml}
     ${statsHtml}
     <div class="sheetbtns" id="pdBtns"></div>`;
   $('pdClose').onclick=()=>$('pModal').classList.remove('open');

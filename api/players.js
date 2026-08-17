@@ -6,6 +6,8 @@ const { matchPlayers } = require("./_lib/match.js");
 
 const SLEEPER_URL = "https://api.sleeper.app/v1/players/nfl";
 const ADP_URL = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=10&year=2026";
+const PROJECTIONS_URL = "https://api.sleeper.com/projections/nfl/2026?season_type=regular";
+const PROJ_FIELDS = ["pts_ppr", "gp", "pass_yd", "pass_td", "pass_int", "rush_att", "rush_yd", "rush_td", "rec", "rec_yd", "rec_td", "sack", "int", "fum_rec"];
 
 // Injury statuses Sleeper actually emits (Active/empty means no designation).
 const INJURY_CODES = {
@@ -39,6 +41,21 @@ async function fetchLiveAdp() {
   return liveAdp;
 }
 
+// Free, undocumented but public Sleeper endpoint (season-long projections,
+// sourced from Rotowire). Keyed by the same Sleeper player_id we already
+// match against for injury/depth data — no separate name-matching needed.
+async function fetchProjections() {
+  const res = await fetch(PROJECTIONS_URL);
+  if (!res.ok) throw new Error(`Sleeper projections API responded ${res.status}`);
+  const data = await res.json();
+  const byId = {};
+  for (const entry of data) {
+    if (!entry.player_id || !entry.stats) continue;
+    byId[entry.player_id] = entry.stats;
+  }
+  return byId;
+}
+
 module.exports = async (req, res) => {
   try {
     const sleeperRes = await fetch(SLEEPER_URL);
@@ -56,16 +73,32 @@ module.exports = async (req, res) => {
       console.warn("Live ADP fetch failed, falling back to consensus ADP only:", err);
     }
 
+    let projById = {};
+    try {
+      projById = await fetchProjections();
+    } catch (err) {
+      console.warn("Projections fetch failed, continuing without them:", err);
+    }
+
     const players = {};
+    let projMatchedCount = 0;
     for (const [internalId, sleeperId] of Object.entries(matched)) {
       const sp = sleeper[sleeperId];
       if (!sp) continue;
+      const pr = projById[sleeperId];
+      let proj = null;
+      if (pr && typeof pr.pts_ppr === "number") {
+        proj = {};
+        for (const f of PROJ_FIELDS) proj[f] = typeof pr[f] === "number" ? pr[f] : null;
+        projMatchedCount++;
+      }
       players[internalId] = {
         sleeper_id: sleeperId,
         injury_status: sp.injury_status ? (INJURY_CODES[sp.injury_status] || sp.injury_status) : null,
         depth_chart_position: sp.depth_chart_position || null,
         depth_chart_order: sp.depth_chart_order || null,
         years_exp: typeof sp.years_exp === "number" ? sp.years_exp : null,
+        proj,
       };
     }
     for (const [internalId, adp] of Object.entries(liveAdp)) {
@@ -78,6 +111,7 @@ module.exports = async (req, res) => {
       matchedCount: Object.keys(matched).length,
       unmatchedIds: unmatched,
       liveAdpMatchedCount: Object.keys(liveAdp).length,
+      projMatchedCount,
       players,
     });
   } catch (err) {
