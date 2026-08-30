@@ -48,16 +48,18 @@
   <!-- AUTH -->
   <div id="authView" class="setup" style="display:none">
     <h2 id="authTitle">Sign in</h2>
-    <p>Sign in to sync your draft and notes across devices.</p>
-    <label>Email</label>
+    <p id="authSub">Sign in to sync your draft and notes across devices.</p>
+    <label id="authEmailLabel">Email</label>
     <input type="email" id="authEmail" autocomplete="email">
-    <label>Password</label>
+    <label id="authPasswordLabel">Password</label>
     <input type="password" id="authPassword" autocomplete="current-password">
     <div class="note" id="authMsg" style="color:var(--warn); min-height:16px"></div>
     <div class="sheetbtns">
       <button class="btn primary" id="authSubmit" style="flex:1; font-size:15px">Sign in</button>
     </div>
-    <div class="note" style="text-align:center; margin-top:14px">
+    <div class="note" id="authLinksRow" style="text-align:center; margin-top:14px">
+      <a href="#" id="authForgot" style="color:var(--accent2)">Forgot password?</a>
+      &nbsp;·&nbsp;
       <a href="#" id="authToggle" style="color:var(--accent2)">Need an account? Sign up</a>
     </div>
   </div>

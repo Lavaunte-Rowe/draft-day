@@ -123,17 +123,71 @@ function initCloudAuth(){
   });
   sb.auth.onAuthStateChange((event)=>{
     if(event==='SIGNED_OUT'){ cloudUser=null; cloudReady=false; }
+    if(event==='PASSWORD_RECOVERY'){
+      setAuthMode('recovery');
+      showAuthView();
+      $('authMsg').style.color='var(--me)';
+      $('authMsg').textContent='Reset link confirmed — choose a new password below.';
+    }
   });
   let authMode='signin';
+  function setAuthMode(mode){
+    authMode=mode;
+    const isRecovery = mode==='recovery';
+    const isSignup = mode==='signup';
+    $('authTitle').textContent = isRecovery ? 'Set new password' : (isSignup ? 'Create account' : 'Sign in');
+    $('authSub').textContent = isRecovery ? 'Choose a new password for your account.' : 'Sign in to sync your draft and notes across devices.';
+    $('authSubmit').textContent = isRecovery ? 'Update password' : (isSignup ? 'Create account' : 'Sign in');
+    $('authEmailLabel').style.display = isRecovery ? 'none' : 'block';
+    $('authEmail').style.display = isRecovery ? 'none' : 'block';
+    $('authPasswordLabel').textContent = isRecovery ? 'New password' : 'Password';
+    $('authPassword').autocomplete = isRecovery ? 'new-password' : (isSignup ? 'new-password' : 'current-password');
+    $('authForgot').style.display = mode==='signin' ? 'inline' : 'none';
+    $('authToggle').style.display = isRecovery ? 'none' : 'inline';
+    $('authToggle').textContent = isSignup ? 'Have an account? Sign in' : 'Need an account? Sign up';
+    $('authLinksRow').style.display = isRecovery ? 'none' : 'block';
+    $('authMsg').textContent='';
+  }
   $('authToggle').onclick=(e)=>{
     e.preventDefault();
-    authMode = authMode==='signin' ? 'signup' : 'signin';
-    $('authSubmit').textContent = authMode==='signin' ? 'Sign in' : 'Create account';
-    $('authTitle').textContent = authMode==='signin' ? 'Sign in' : 'Create account';
-    $('authToggle').textContent = authMode==='signin' ? 'Need an account? Sign up' : 'Have an account? Sign in';
-    $('authMsg').textContent='';
+    setAuthMode(authMode==='signin' ? 'signup' : 'signin');
+  };
+  $('authForgot').onclick=async(e)=>{
+    e.preventDefault();
+    const email=$('authEmail').value.trim();
+    if(!email){ $('authMsg').style.color='var(--warn)'; $('authMsg').textContent='Enter your email above first.'; return; }
+    $('authForgot').style.pointerEvents='none';
+    try{
+      const {error}=await sb.auth.resetPasswordForEmail(email, {redirectTo: window.location.origin});
+      if(error) throw error;
+      $('authMsg').style.color='var(--me)';
+      $('authMsg').textContent=`Check ${email} for a reset link.`;
+    }catch(e){
+      $('authMsg').style.color='var(--warn)';
+      $('authMsg').textContent = e.message || 'Something went wrong.';
+    }finally{
+      $('authForgot').style.pointerEvents='';
+    }
   };
   $('authSubmit').onclick=async()=>{
+    if(authMode==='recovery'){
+      const password=$('authPassword').value;
+      if(!password){ $('authMsg').style.color='var(--warn)'; $('authMsg').textContent='Enter a new password.'; return; }
+      $('authSubmit').disabled=true; $('authMsg').textContent='';
+      try{
+        const {error}=await sb.auth.updateUser({password});
+        if(error) throw error;
+        const {data}=await sb.auth.getSession();
+        toast('Password updated');
+        await onSignedIn(data.session.user);
+      }catch(e){
+        $('authMsg').style.color='var(--warn)';
+        $('authMsg').textContent = e.message || 'Something went wrong.';
+      }finally{
+        $('authSubmit').disabled=false;
+      }
+      return;
+    }
     const email=$('authEmail').value.trim(); const password=$('authPassword').value;
     if(!email||!password){ $('authMsg').textContent='Enter email and password.'; return; }
     $('authSubmit').disabled=true; $('authMsg').textContent='';
