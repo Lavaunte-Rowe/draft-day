@@ -30,9 +30,8 @@ async function loadEnrichment(){
     if(!res.ok) throw new Error('bad status '+res.status);
     const data = await res.json();
     ENRICH = data.players || {};
-    // Live ADP feeds the value calc (and the ADP number shown in the UI) for
-    // players FFC has real draft volume on. Tiers and positional rank (pr)
-    // are computed/curated separately and are never touched here.
+    // Live ADP feeds the value calc and the ADP number shown in the UI, for
+    // players FFC has real draft volume on.
     for(const p of PLAYERS){
       const e = ENRICH[p.id];
       if(e && typeof e.live_adp === 'number'){
@@ -40,6 +39,10 @@ async function loadEnrichment(){
         p.adp = e.live_adp;
       }
     }
+    // Positional rank and tier are now fully derived from that live data too —
+    // no manually-curated ranking left anywhere in the pipeline.
+    recomputeLivePositionalRanks();
+    computeTiers();
     if(badge) badge.textContent = '· live data synced';
   }catch(e){
     console.warn('Live player data unavailable — falling back to consensus rankings only.', e);
@@ -235,8 +238,8 @@ function avatarHtml(p, size){
     : '';
   return `<div class="${cls}" style="--ring:${color}">${fb}${img}</div>`;
 }
-const ADP_TOOLTIP='Consensus ranking, manually compiled July 2026 — not a live feed.';
-const LIVE_ADP_TOOLTIP='Live ADP from real drafts, updated daily (Fantasy Football Calculator). Tier and positional rank stay on the curated consensus.';
+const ADP_TOOLTIP='No live draft data for this player — falling back to the last-known consensus number.';
+const LIVE_ADP_TOOLTIP='Live ADP from real drafts, updated daily (Fantasy Football Calculator). Positional rank and tier are also live, derived from ADP and projections.';
 function adpTooltip(id){ const e=ENRICH[id]; return (e && typeof e.live_adp==='number') ? LIVE_ADP_TOOLTIP : ADP_TOOLTIP; }
 const INJURY_LABELS={Q:'Questionable', D:'Doubtful', O:'Out', IR:'Injured Reserve', PUP:'PUP', SUSP:'Suspended', NA:'Not Active'};
 function injuryBadgeHtml(id){
@@ -284,7 +287,7 @@ function totalPicks(){ return S.teams*S.rounds; }
 function pickForRoundTeam(r,t){ const p=(r%2===1)?t:(S.teams-t+1); return (r-1)*S.teams+p; }
 /* ---------- tiers (ADP-gap based, per position) ---------- */
 const tiers = {};
-(function(){
+function computeTiers(){
   const byPos = {};
   for(const p of PLAYERS) (byPos[p.p]=byPos[p.p]||[]).push(p);
   for(const pos in byPos){
@@ -298,7 +301,33 @@ const tiers = {};
       tiers[list[i].id]=t;
     }
   }
-})();
+}
+computeTiers();
+// Positional rank, recomputed from live data once enrichment loads: players
+// with live ADP are ranked by it; players with no live draft volume but a
+// live projection are ranked by projected points, after the ADP group;
+// the handful with neither live signal fall back to the static ADP as a
+// last-resort tiebreaker (nothing else to rank them by).
+function recomputeLivePositionalRanks(){
+  const byPos = {};
+  for(const p of PLAYERS) (byPos[p.p]=byPos[p.p]||[]).push(p);
+  for(const pos in byPos){
+    const withAdp=[], withProjOnly=[], neither=[];
+    for(const p of byPos[pos]){
+      const e = ENRICH[p.id];
+      if(e && typeof e.live_adp==='number') withAdp.push(p);
+      else if(e && e.proj && typeof e.proj.pts_ppr==='number') withProjOnly.push(p);
+      else neither.push(p);
+    }
+    withAdp.sort((a,b)=>a.adp-b.adp);
+    withProjOnly.sort((a,b)=>ENRICH[b.id].proj.pts_ppr - ENRICH[a.id].proj.pts_ppr);
+    neither.sort((a,b)=>a.adp-b.adp);
+    [...withAdp, ...withProjOnly, ...neither].forEach((p,i)=>{
+      if(p._staticPr===undefined) p._staticPr=p.pr;
+      p.pr=i+1;
+    });
+  }
+}
 /* ---------- my roster assembly ---------- */
 function myRoster(){
   const picks = S.actions.filter(a=>a.kind==='mine')
