@@ -39,9 +39,10 @@ async function loadEnrichment(){
         p.adp = e.live_adp;
       }
     }
-    // Positional rank and tier are now fully derived from that live data too —
-    // no manually-curated ranking left anywhere in the pipeline.
+    // Positional rank, overall rank, and tier are now fully derived from that
+    // live data too — no manually-curated ranking left anywhere in the pipeline.
     recomputeLivePositionalRanks();
+    recomputeLiveOverallRank();
     computeTiers();
     if(badge) badge.textContent = '· live data synced';
   }catch(e){
@@ -303,30 +304,40 @@ function computeTiers(){
   }
 }
 computeTiers();
-// Positional rank, recomputed from live data once enrichment loads: players
-// with live ADP are ranked by it; players with no live draft volume but a
-// live projection are ranked by projected points, after the ADP group;
-// the handful with neither live signal fall back to the static ADP as a
-// last-resort tiebreaker (nothing else to rank them by).
+// Shared tiered live sort: live ADP first (ascending), then live projected
+// points for anyone with no live draft volume, then static ADP as a last
+// resort for the handful with neither live signal.
+function tieredLiveSort(list){
+  const withAdp=[], withProjOnly=[], neither=[];
+  for(const p of list){
+    const e = ENRICH[p.id];
+    if(e && typeof e.live_adp==='number') withAdp.push(p);
+    else if(e && e.proj && typeof e.proj.pts_ppr==='number') withProjOnly.push(p);
+    else neither.push(p);
+  }
+  withAdp.sort((a,b)=>a.adp-b.adp);
+  withProjOnly.sort((a,b)=>ENRICH[b.id].proj.pts_ppr - ENRICH[a.id].proj.pts_ppr);
+  neither.sort((a,b)=>a.adp-b.adp);
+  return [...withAdp, ...withProjOnly, ...neither];
+}
+// Positional rank, recomputed from live data once enrichment loads.
 function recomputeLivePositionalRanks(){
   const byPos = {};
   for(const p of PLAYERS) (byPos[p.p]=byPos[p.p]||[]).push(p);
   for(const pos in byPos){
-    const withAdp=[], withProjOnly=[], neither=[];
-    for(const p of byPos[pos]){
-      const e = ENRICH[p.id];
-      if(e && typeof e.live_adp==='number') withAdp.push(p);
-      else if(e && e.proj && typeof e.proj.pts_ppr==='number') withProjOnly.push(p);
-      else neither.push(p);
-    }
-    withAdp.sort((a,b)=>a.adp-b.adp);
-    withProjOnly.sort((a,b)=>ENRICH[b.id].proj.pts_ppr - ENRICH[a.id].proj.pts_ppr);
-    neither.sort((a,b)=>a.adp-b.adp);
-    [...withAdp, ...withProjOnly, ...neither].forEach((p,i)=>{
+    tieredLiveSort(byPos[pos]).forEach((p,i)=>{
       if(p._staticPr===undefined) p._staticPr=p.pr;
       p.pr=i+1;
     });
   }
+}
+// Live overall rank (independent of the permanent internal p.id, which stays
+// a stable primary key everywhere else — status/actions/queue/ENRICH are all
+// keyed by it and must never change). This is what the board's rank badge
+// and the player sheet's "Rank" fact show; anywhere explicitly labeled
+// "Consensus" intentionally keeps showing the static p.id instead.
+function recomputeLiveOverallRank(){
+  tieredLiveSort(PLAYERS).forEach((p,i)=>{ p.liveRank=i+1; });
 }
 /* ---------- my roster assembly ---------- */
 function myRoster(){
@@ -460,7 +471,7 @@ function playerRow(p){
     +(S.ui.cmp.includes(p.id)?' cmpsel':'');
   row.style.borderLeftColor = TEAM_COLORS[p.t]||TEAM_COLORS.FA;
   row.innerHTML=`<div class="pcard-top">
-      <div class="pcard-rank">${p.id}</div>
+      <div class="pcard-rank">${p.liveRank||p.id}</div>
       ${avatarHtml(p,'sm')}
       <div class="pcard-info">${pcardInfoHtml(p,{nameExtra:queueStarHtml(p.id)})}</div>
     </div>
@@ -529,6 +540,7 @@ function renderBoard(){
     if(q && !(p.n.toLowerCase().includes(q)||p.t.toLowerCase().includes(q))) return false;
     return true;
   });
+  list.sort((a,b)=>a.adp-b.adp);
   const shown=list.slice(0,S.ui.shown);
   if(!list.length){
     const q2=S.ui.search;
@@ -659,7 +671,7 @@ function openPlayer(id){
       <button class="iconbtn" id="pdClose">✕</button>
     </div>
     <div class="pd-facts">
-      <div class="fact"><div class="v">#${p.id}</div><div class="l">Rank</div></div>
+      <div class="fact"><div class="v">#${p.liveRank||p.id}</div><div class="l">Rank</div></div>
       <div class="fact" title="${adpTooltip(p.id)}"><div class="v">${p.adp}</div><div class="l">ADP</div></div>
       <div class="fact"><div class="v">${tiers[p.id]}</div><div class="l">Tier</div></div>
       <div class="fact"><div class="v">${p.b||'—'}</div><div class="l">Bye</div></div>
