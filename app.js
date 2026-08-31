@@ -828,6 +828,8 @@ function openCompare(){
     +rowH('Tier', info.map(x=>tiers[x.p.id]), -1)
     +rowH('Bye', info.map(x=>x.p.b||null), 0, info.map(x=>x.p.b&&myByes[x.p.b]?`⚠ ${myByes[x.p.b]} of yours`:''))
     +rowH('Injury', info.map(x=>{ const e=ENRICH[x.p.id]; return e?(e.injury_status||'Active'):null; }), 0)
+    +rowH('2026 proj (PPR)', info.map(x=>{ const pr=ENRICH[x.p.id]&&ENRICH[x.p.id].proj; return pr?pr.pts_ppr:null; }), 1)
+    +rowH(`<span title="Your exact league scoring — not computed for K/DST, see the player sheet.">Custom league pts</span>`, info.map(x=>{ const pr=ENRICH[x.p.id]&&ENRICH[x.p.id].proj; return pr?pr.customPts:null; }), 1)
     +rowH('2025 pts', info.map(x=>x.s?x.s.fp:null), 1)
     +rowH('Pts/game', info.map(x=>x.ppg), 1)
     +rowH('Games', info.map(x=>x.s?x.s.g:null), 0)
@@ -877,6 +879,8 @@ function buildCompareText(){
     const sc=scores.find(x=>x.p.id===id);
     lines.push(`${i+1}. ${p.n} — ${p.p}${p.pr}, ${p.t}, bye ${p.b||'—'} · consensus #${p.id}, ADP ${liveAdpOrStatic(p)}, Tier ${tiers[p.id]}${st?` · ALREADY DRAFTED (${st})`:''}`);
     lines.push(`   2025: ${s?`${s.g} games, ${s.fp.toFixed(1)} PPR pts (${(s.fp/s.g).toFixed(1)}/g) — ${compact2025(id)}`:'no NFL stats (rookie or missed season)'}`);
+    const pr=ENRICH[id]&&ENRICH[id].proj;
+    if(pr) lines.push(`   2026 proj: ${pr.pts_ppr.toFixed(1)} generic PPR pts${typeof pr.customPts==='number'?` · ${pr.customPts.toFixed(1)} pts under my league's exact scoring`:''}`);
     if(sc && sc.reasons.length) lines.push(`   App notes: ${sc.reasons.slice(0,3).map(r=>r.t).join('; ')}`);
   });
   lines.push('');
