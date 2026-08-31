@@ -635,6 +635,7 @@ function boardSortValue(p, key){
     case '25pts': return s ? s.fp : null;
     case '25td': return statsRowSum(s, /td/i);
     case '25rec': return statsRowExact(s, 'Rec');
+    case '25passyd': return statsRowExact(s, 'Pass yds');
     case '25rushyd': return statsRowExact(s, 'Rush yds');
     case '25recyd': return statsRowExact(s, 'Rec yds');
     case '25totyd': return statsRowSum(s, /yds/i);
@@ -642,6 +643,7 @@ function boardSortValue(p, key){
     case 'custompts': return pr ? pr.customPts : null;
     case 'projtd': return projSum(pr, ['pass_td','rush_td','rec_td']);
     case 'projrec': return pr ? pr.rec : null;
+    case 'projpassyd': return pr ? pr.pass_yd : null;
     case 'projrushyd': return pr ? pr.rush_yd : null;
     case 'projrecyd': return pr ? pr.rec_yd : null;
     case 'projtotyd': return projSum(pr, ['pass_yd','rush_yd','rec_yd']);
