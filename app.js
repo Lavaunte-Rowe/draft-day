@@ -700,7 +700,7 @@ function renderBoard(){
     const showBreaks = (S.ui.sortBy==='adp' || !S.ui.sortBy) && S.pick<=totalPicks();
     const breaksByIndex = {};
     if(showBreaks){
-      for(const pickNum of nextMyPicks(3)){
+      for(const pickNum of nextMyPicks(S.rounds)){ // every remaining pick of the draft, not just the next few
         if(pickNum<=S.pick) continue; // this pick is now/past, nothing to project
         const idx = list.filter(p=>liveAdpOrStatic(p)<pickNum).length;
         if(idx>0 && idx<=shown.length && !breaksByIndex[idx]) breaksByIndex[idx]=[];
