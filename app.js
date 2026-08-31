@@ -690,7 +690,32 @@ function renderBoard(){
         <div class="empty-sub">${S.ui.hideDrafted?'Try showing drafted players, or clear the search/position filter.':'Try a different search or position filter.'}</div>
       </div>`;
   } else {
-    for(const p of shown) el.appendChild(playerRow(p));
+    // Faint "likely gone by your next picks" dividers — only meaningful when
+    // the list is actually in ADP order (that's the one sort that predicts
+    // draft order; inserting these at a position index into a points/yards
+    // sort would be misleading). For each of the user's next few picks,
+    // count how many of the currently-filtered/visible players have a
+    // better (lower) live ADP than that pick number — since the list is
+    // ADP-sorted, that count is exactly the row index to break after.
+    const showBreaks = (S.ui.sortBy==='adp' || !S.ui.sortBy) && S.pick<=totalPicks();
+    const breaksByIndex = {};
+    if(showBreaks){
+      for(const pickNum of nextMyPicks(3)){
+        if(pickNum<=S.pick) continue; // this pick is now/past, nothing to project
+        const idx = list.filter(p=>liveAdpOrStatic(p)<pickNum).length;
+        if(idx>0 && idx<=shown.length && !breaksByIndex[idx]) breaksByIndex[idx]=[];
+        if(idx>0 && idx<=shown.length) breaksByIndex[idx].push(pickNum);
+      }
+    }
+    shown.forEach((p,i)=>{
+      el.appendChild(playerRow(p));
+      const picks = breaksByIndex[i+1];
+      if(picks){
+        const d=document.createElement('div'); d.className='poolbreak';
+        d.innerHTML=`<span>${picks.map(pk=>`likely gone by pick #${pk} (Rd ${roundOf(pk)})`).join(' · ')}</span>`;
+        el.appendChild(d);
+      }
+    });
   }
   $('showMore').style.display = list.length>S.ui.shown ? 'block':'none';
 }
