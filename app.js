@@ -487,11 +487,37 @@ function reqEditor(container, req){
     $(`req-${container.id}-${k}`).textContent=req[k];
   };
 }
+// On-the-clock chime — synthesized via Web Audio (no audio file to host/bundle
+// on a no-build-step static site). Lazily creates the AudioContext on first
+// use so nothing runs before a user gesture (autoplay policies block audio
+// otherwise) — by the time this can fire the user has already interacted
+// with the app plenty (starting the draft, logging picks).
+let audioCtx = null;
+let wasOnClock = false;
+function playOnClockChime(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+    [[523.25, 0], [659.25, 0.12], [783.99, 0.24]].forEach(([freq, delay])=>{
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type='sine'; osc.frequency.value=freq;
+      gain.gain.setValueAtTime(0, now+delay);
+      gain.gain.linearRampToValueAtTime(0.25, now+delay+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now+delay+0.35);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(now+delay); osc.stop(now+delay+0.36);
+    });
+  }catch(e){ console.warn('On-the-clock chime failed to play', e); }
+}
 function renderStatus(){
   const done = S.pick > totalPicks();
   $('stRound').textContent = done ? '✓' : roundOf(S.pick);
   $('stPick').textContent = done ? 'End' : `${S.pick}`;
   const mine = !done && teamOnClock(S.pick)===S.slot;
+  if(mine && !wasOnClock) playOnClockChime();
+  wasOnClock = mine;
   $('stClockBox').classList.toggle('onclock', mine);
   $('stClock').textContent = done ? '—' : (mine ? 'YOU' : teamLabel(teamOnClock(S.pick)));
   $('stClockLab').textContent = mine ? 'Your pick!' : 'On the clock';
