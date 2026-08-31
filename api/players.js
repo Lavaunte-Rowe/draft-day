@@ -3,11 +3,19 @@
 const { PLAYERS } = require("../data/players.js");
 const overrides = require("../data/sleeper-overrides.json");
 const { matchPlayers } = require("./_lib/match.js");
+const { computeCustomPts } = require("./_lib/scoring.js");
 
 const SLEEPER_URL = "https://api.sleeper.app/v1/players/nfl";
 const ADP_URL = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=10&year=2026";
 const PROJECTIONS_URL = "https://api.sleeper.com/projections/nfl/2026?season_type=regular";
-const PROJ_FIELDS = ["pts_ppr", "gp", "pass_yd", "pass_td", "pass_int", "rush_att", "rush_yd", "rush_td", "rec", "rec_yd", "rec_td", "sack", "int", "fum_rec"];
+const PROJ_FIELDS = [
+  "pts_ppr", "gp",
+  "pass_yd", "pass_td", "pass_int", "pass_2pt",
+  "rush_att", "rush_yd", "rush_td", "rush_2pt",
+  "rec", "rec_yd", "rec_td", "rec_2pt",
+  "fum_lost", "sack", "int", "fum_rec",
+  "idp_tkl_solo", "idp_tkl_ast", "idp_sack", "idp_int", "idp_ff", "idp_fum_rec", "idp_safe", "idp_blk_kick",
+];
 
 // Injury statuses Sleeper actually emits (Active/empty means no designation).
 const INJURY_CODES = {
@@ -80,6 +88,9 @@ module.exports = async (req, res) => {
       console.warn("Projections fetch failed, continuing without them:", err);
     }
 
+    const playersById = {};
+    for (const p of PLAYERS) playersById[p.id] = p;
+
     const players = {};
     let projMatchedCount = 0;
     for (const [internalId, sleeperId] of Object.entries(matched)) {
@@ -90,6 +101,7 @@ module.exports = async (req, res) => {
       if (pr && typeof pr.pts_ppr === "number") {
         proj = {};
         for (const f of PROJ_FIELDS) proj[f] = typeof pr[f] === "number" ? pr[f] : null;
+        proj.customPts = computeCustomPts(pr, playersById[internalId] && playersById[internalId].p);
         projMatchedCount++;
       }
       players[internalId] = {

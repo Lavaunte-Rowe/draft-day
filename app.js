@@ -307,16 +307,21 @@ computeTiers();
 // Shared tiered live sort: live ADP first (ascending), then live projected
 // points for anyone with no live draft volume, then static ADP as a last
 // resort for the handful with neither live signal.
+function projValueFor(id){
+  const pr = ENRICH[id] && ENRICH[id].proj;
+  if(!pr) return null;
+  return typeof pr.customPts==='number' ? pr.customPts : (typeof pr.pts_ppr==='number' ? pr.pts_ppr : null);
+}
 function tieredLiveSort(list){
   const withAdp=[], withProjOnly=[], neither=[];
   for(const p of list){
     const e = ENRICH[p.id];
     if(e && typeof e.live_adp==='number') withAdp.push(p);
-    else if(e && e.proj && typeof e.proj.pts_ppr==='number') withProjOnly.push(p);
+    else if(projValueFor(p.id)!==null) withProjOnly.push(p);
     else neither.push(p);
   }
   withAdp.sort((a,b)=>a.adp-b.adp);
-  withProjOnly.sort((a,b)=>ENRICH[b.id].proj.pts_ppr - ENRICH[a.id].proj.pts_ppr);
+  withProjOnly.sort((a,b)=>projValueFor(b.id) - projValueFor(a.id));
   neither.sort((a,b)=>a.adp-b.adp);
   return [...withAdp, ...withProjOnly, ...neither];
 }
