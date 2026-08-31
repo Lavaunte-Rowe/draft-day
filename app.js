@@ -680,14 +680,20 @@ function openPlayer(id){
     const pr=e.proj;
     const ppg = pr.gp ? (pr.pts_ppr/pr.gp).toFixed(1) : '—';
     const rows = projRowsFor(p.p, pr).filter(r=>r[1]!=null);
+    const hasCustom = typeof pr.customPts==='number';
+    const customHtml = hasCustom
+      ? `<div class="fact" style="grid-column:span 3; border-color:var(--accent2)"><div class="v" style="color:var(--accent2)">${pr.customPts.toFixed(1)} pts</div><div class="l">Custom league pts (your exact scoring)</div></div>`
+      : `<div class="note" style="margin:8px 2px 0">Custom league scoring isn't computed for ${p.p==='DST'?'team defenses':'kickers'} — see the note below.</div>`;
     projHtml=`<h2 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:16px 2px 6px">2026 projection (PPR)</h2>
       <div class="note" style="margin:0 2px 6px">Season-long model projection, via Rotowire — refreshed daily.</div>
       <div class="pd-facts" style="grid-template-columns:repeat(3,1fr); margin:8px 0 0">
-        <div class="fact"><div class="v">${pr.pts_ppr.toFixed(1)}</div><div class="l">Proj. pts</div></div>
+        <div class="fact"><div class="v">${pr.pts_ppr.toFixed(1)}</div><div class="l">Proj. pts (generic PPR)</div></div>
         <div class="fact"><div class="v">${ppg}</div><div class="l">Pts / game</div></div>
         <div class="fact"><div class="v">${pr.gp!=null?Math.round(pr.gp):'—'}</div><div class="l">Games</div></div>
+        ${customHtml}
       </div>
-      ${rows.length?`<div class="pd-stats">${rows.map(r=>`<div class="fact"><div class="v">${r[1].toLocaleString()}</div><div class="l">${r[0]}</div></div>`).join('')}</div>`:''}`;
+      ${rows.length?`<div class="pd-stats">${rows.map(r=>`<div class="fact"><div class="v">${r[1].toLocaleString()}</div><div class="l">${r[0]}</div></div>`).join('')}</div>`:''}
+      <div class="note" style="margin:8px 2px 0">Doesn't include: ${UNCOMPUTABLE.join('; ')}.</div>`;
   }
   let statsHtml;
   if(s){
