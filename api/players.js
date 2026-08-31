@@ -8,6 +8,7 @@ const { computeCustomPts } = require("./_lib/scoring.js");
 const SLEEPER_URL = "https://api.sleeper.app/v1/players/nfl";
 const ADP_URL = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=10&year=2026";
 const PROJECTIONS_URL = "https://api.sleeper.com/projections/nfl/2026?season_type=regular";
+const IDP_POSITIONS = ["CB", "DL", "SS", "DE", "DB", "DT", "LB", "NT"];
 const PROJ_FIELDS = [
   "pts_ppr", "gp",
   "pass_yd", "pass_td", "pass_int", "pass_2pt",
@@ -97,11 +98,12 @@ module.exports = async (req, res) => {
       const sp = sleeper[sleeperId];
       if (!sp) continue;
       const pr = projById[sleeperId];
+      const position = playersById[internalId] && playersById[internalId].p;
       let proj = null;
       if (pr && typeof pr.pts_ppr === "number") {
         proj = {};
         for (const f of PROJ_FIELDS) proj[f] = typeof pr[f] === "number" ? pr[f] : null;
-        proj.customPts = computeCustomPts(pr, playersById[internalId] && playersById[internalId].p);
+        proj.customPts = computeCustomPts(pr, position);
         projMatchedCount++;
       }
       players[internalId] = {
@@ -112,6 +114,12 @@ module.exports = async (req, res) => {
         years_exp: typeof sp.years_exp === "number" ? sp.years_exp : null,
         proj,
       };
+      // FFC has no IDP coverage at all — IDP players get their live ADP from
+      // Sleeper's own IDP-specific ADP field instead (adp_idp), sourced from
+      // the same projections payload already fetched above.
+      if (IDP_POSITIONS.includes(position) && pr && typeof pr.adp_idp === "number" && pr.adp_idp < 900) {
+        players[internalId].live_adp = pr.adp_idp;
+      }
     }
     for (const [internalId, adp] of Object.entries(liveAdp)) {
       players[internalId] = { ...(players[internalId] || {}), live_adp: adp };

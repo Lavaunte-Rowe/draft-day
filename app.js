@@ -31,8 +31,15 @@ async function loadEnrichment(){
     const data = await res.json();
     ENRICH = data.players || {};
     // Live ADP feeds the value calc and the ADP number shown in the UI, for
-    // players FFC has real draft volume on.
+    // players FFC has real draft volume on. IDP players are deliberately
+    // skipped here — their live_adp (Sleeper's adp_idp) is on a different
+    // scale than real overall-pick ADP, so overwriting p.adp with it would
+    // corrupt the recommendation engine's value calc and the all-positions
+    // board sort for every other position. Their live ranking still works
+    // correctly via liveAdpOrStatic() in computeTiers/tieredLiveSort, which
+    // reads ENRICH[id].live_adp directly instead of relying on p.adp.
     for(const p of PLAYERS){
+      if(idpOk(p.p)) continue;
       const e = ENRICH[p.id];
       if(e && typeof e.live_adp === 'number'){
         if(p._consensusAdp === undefined) p._consensusAdp = p.adp;
@@ -85,6 +92,7 @@ async function loadFromCloud(){
     if(data){
       if(data.draft_state && Array.isArray(data.draft_state.actions)){
         S = {...S, ...data.draft_state, ui:S.ui};
+        S.req = {...DEF_REQ, ...S.req}; // backfill any lineup slots added since this draft was saved (e.g. IDP)
         rebuildStatus();
       }
       // one-time migration: fold any legacy freeform-text note into the new structured list
@@ -286,18 +294,39 @@ function myPickNumbers(){ const out=[];
 function nextMyPicks(n){ return myPickNumbers().filter(x=>x>=S.pick).slice(0,n); }
 function totalPicks(){ return S.teams*S.rounds; }
 function pickForRoundTeam(r,t){ const p=(r%2===1)?t:(S.teams-t+1); return (r-1)*S.teams+p; }
+// Individual defensive players — real Sleeper position codes, all filling
+// one flexible "IDP" roster slot (not split by exact sub-position). Their
+// live ADP (Sleeper's adp_idp) is on a different scale than the rest of the
+// pool's real overall-pick ADP — see loadEnrichment/tieredLiveSort/
+// recomputeLiveOverallRank for how that's kept from corrupting anything
+// offense-comparable (the recommendation engine's value calc, the all-
+// positions board sort, the cross-position overall rank badge).
+const IDP_POSITIONS = ['CB','DL','SS','DE','DB','DT','LB','NT'];
+const idpOk = p => IDP_POSITIONS.includes(p);
+function rankGroupOf(p){ return idpOk(p.p) ? 'IDP' : p.p; }
+// IDP players' p.adp is deliberately never live-overwritten (see
+// loadEnrichment) since Sleeper's IDP-specific ADP scale isn't comparable to
+// the rest of the pool's real overall-pick ADP. This reads the right live
+// number for ranking/tier purposes regardless: live_adp when present
+// (which for offense equals the already-overwritten p.adp, and for IDP is
+// the adp_idp value that p.adp intentionally doesn't carry), else p.adp.
+function liveAdpOrStatic(p){
+  const e = ENRICH[p.id];
+  return (e && typeof e.live_adp==='number') ? e.live_adp : p.adp;
+}
 /* ---------- tiers (ADP-gap based, per position) ---------- */
 const tiers = {};
 function computeTiers(){
   const byPos = {};
-  for(const p of PLAYERS) (byPos[p.p]=byPos[p.p]||[]).push(p);
+  for(const p of PLAYERS) { const g=rankGroupOf(p); (byPos[g]=byPos[g]||[]).push(p); }
   for(const pos in byPos){
-    const list = byPos[pos].sort((a,b)=>a.adp-b.adp);
+    const list = byPos[pos].sort((a,b)=>liveAdpOrStatic(a)-liveAdpOrStatic(b));
     let t=1;
     tiers[list[0].id]=1;
     for(let i=1;i<list.length;i++){
-      const gap=list[i].adp-list[i-1].adp;
-      const thresh=Math.max(5, list[i-1].adp*0.13);
+      const prevAdp=liveAdpOrStatic(list[i-1]), curAdp=liveAdpOrStatic(list[i]);
+      const gap=curAdp-prevAdp;
+      const thresh=Math.max(5, prevAdp*0.13);
       if(gap>=thresh && t<12) t++;
       tiers[list[i].id]=t;
     }
@@ -320,15 +349,17 @@ function tieredLiveSort(list){
     else if(projValueFor(p.id)!==null) withProjOnly.push(p);
     else neither.push(p);
   }
-  withAdp.sort((a,b)=>a.adp-b.adp);
+  withAdp.sort((a,b)=>liveAdpOrStatic(a)-liveAdpOrStatic(b));
   withProjOnly.sort((a,b)=>projValueFor(b.id) - projValueFor(a.id));
-  neither.sort((a,b)=>a.adp-b.adp);
+  neither.sort((a,b)=>liveAdpOrStatic(a)-liveAdpOrStatic(b));
   return [...withAdp, ...withProjOnly, ...neither];
 }
-// Positional rank, recomputed from live data once enrichment loads.
+// Positional rank, recomputed from live data once enrichment loads. IDP
+// sub-positions (LB/DB/DL/etc.) are pooled into one shared "IDP" ranking
+// group via rankGroupOf, since they all compete for the same one flex slot.
 function recomputeLivePositionalRanks(){
   const byPos = {};
-  for(const p of PLAYERS) (byPos[p.p]=byPos[p.p]||[]).push(p);
+  for(const p of PLAYERS) { const g=rankGroupOf(p); (byPos[g]=byPos[g]||[]).push(p); }
   for(const pos in byPos){
     tieredLiveSort(byPos[pos]).forEach((p,i)=>{
       if(p._staticPr===undefined) p._staticPr=p.pr;
@@ -341,21 +372,28 @@ function recomputeLivePositionalRanks(){
 // keyed by it and must never change). This is what the board's rank badge
 // and the player sheet's "Rank" fact show; anywhere explicitly labeled
 // "Consensus" intentionally keeps showing the static p.id instead.
+// IDP players are excluded here — their live ADP (Sleeper's adp_idp) isn't
+// on the same real-draft-order scale as everyone else's, so mixing them into
+// one cross-position "overall pick" rank would misleadingly suggest elite
+// IDP players go far earlier than they'd actually be taken in this league's
+// single-flex-IDP-slot format. They still get a fully live positional rank
+// (above) and tier (via rankGroupOf) — just not a cross-position badge.
 function recomputeLiveOverallRank(){
-  tieredLiveSort(PLAYERS).forEach((p,i)=>{ p.liveRank=i+1; });
+  tieredLiveSort(PLAYERS.filter(p=>!idpOk(p.p))).forEach((p,i)=>{ p.liveRank=i+1; });
 }
 /* ---------- my roster assembly ---------- */
 function myRoster(){
   const picks = S.actions.filter(a=>a.kind==='mine')
     .map(a=>({...PLAYERS.find(p=>p.id===a.id), pickNo:a.pick}));
   const slots = [];
-  for(const pos of ['QB','RB','WR','TE','FLEX','K','DST'])
+  for(const pos of ['QB','RB','WR','TE','FLEX','K','DST','IDP'])
     for(let i=0;i<(S.req[pos]||0);i++) slots.push({lab:pos+(S.req[pos]>1?' '+(i+1):''), pos, pl:null});
   for(let i=0;i<(S.req.BN||0);i++) slots.push({lab:'BN '+(i+1), pos:'BN', pl:null});
   const flexOK = p=>['RB','WR','TE'].includes(p);
   for(const pl of picks){
     let s = slots.find(x=>!x.pl && x.pos===pl.p)
          || (flexOK(pl.p) && slots.find(x=>!x.pl && x.pos==='FLEX'))
+         || (idpOk(pl.p) && slots.find(x=>!x.pl && x.pos==='IDP'))
          || slots.find(x=>!x.pl && x.pos==='BN');
     if(s) s.pl=pl;
   }
@@ -392,6 +430,7 @@ function scoreAvailable(){
     let w;
     if(need[p.p]) { w=1.0; reasons.push({t:`Starting ${p.p} open`, c:'good'}); }
     else if(need.FLEX && ['RB','WR','TE'].includes(p.p)) { w=0.88; reasons.push({t:'Fills FLEX', c:'good'}); }
+    else if(need.IDP && idpOk(p.p)) { w=0.88; reasons.push({t:'Fills IDP', c:'good'}); }
     else if(p.p==='QB'||p.p==='TE') { w=(myCount[p.p]>=2)?0.12:0.3; }
     else if(p.p==='K'||p.p==='DST') { w=0.02; }
     else { w = (myCount[p.p]||0) <= 3 ? 0.62 : 0.42; reasons.push({t:'Bench depth', c:''}); }
@@ -435,7 +474,7 @@ function fillSelect(sel, from, to, cur){ sel.innerHTML='';
     if(i===cur)o.selected=true; sel.appendChild(o);} }
 function reqEditor(container, req){
   container.innerHTML='';
-  for(const k of ['QB','RB','WR','TE','FLEX','K','DST','BN']){
+  for(const k of ['QB','RB','WR','TE','FLEX','K','DST','IDP','BN']){
     const d=document.createElement('div'); d.className='reqitem';
     d.innerHTML=`<div class="lab">${k}</div><div class="stepper">
       <button data-k="${k}" data-d="-1">−</button><span class="num" id="req-${container.id}-${k}">${req[k]}</span>
@@ -465,7 +504,7 @@ function pcardInfoHtml(p, opts){
   const bye = p.b ? `Bye ${p.b}` : 'FA';
   const chipsHtml = opts.chips ? `<div class="pcard-chips">${opts.chips}</div>` : '';
   return `<div class="pcard-name">${p.n}${opts.nameExtra||''}${injuryBadgeHtml(p.id)}</div>
-    <div class="pcard-meta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · <span title="${adpTooltip(p.id)}">ADP ${p.adp}</span> · <span class="tierb">Tier ${tiers[p.id]}</span></div>
+    <div class="pcard-meta"><span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>${teamLogoHtml(p.t)}${p.t} · ${bye} · <span title="${adpTooltip(p.id)}">ADP ${liveAdpOrStatic(p)}</span> · <span class="tierb">Tier ${tiers[p.id]}</span></div>
     ${chipsHtml}`;
 }
 function queueStarHtml(id){ return inQueue(id) ? ' <span style="color:var(--queue)">★</span>' : ''; }
@@ -541,11 +580,17 @@ function renderBoard(){
     if(S.ui.hideDrafted && status[p.id]) return false;
     if(S.ui.pos==='ALL'){}
     else if(S.ui.pos==='FLEX'){ if(!['RB','WR','TE'].includes(p.p)) return false; }
+    else if(S.ui.pos==='IDP'){ if(!idpOk(p.p)) return false; }
     else if(p.p!==S.ui.pos) return false;
     if(q && !(p.n.toLowerCase().includes(q)||p.t.toLowerCase().includes(q))) return false;
     return true;
   });
-  list.sort((a,b)=>a.adp-b.adp);
+  // Filtered to IDP specifically: sort by their live ADP (Sleeper's adp_idp,
+  // internally consistent within the IDP pool) instead of the static p.adp
+  // placeholder that's deliberately never live-overwritten for them — see
+  // loadEnrichment. Every other view sorts by p.adp as before.
+  if(S.ui.pos==='IDP') list.sort((a,b)=>liveAdpOrStatic(a)-liveAdpOrStatic(b));
+  else list.sort((a,b)=>a.adp-b.adp);
   const shown=list.slice(0,S.ui.shown);
   if(!list.length){
     const q2=S.ui.search;
@@ -621,6 +666,7 @@ function projRowsFor(pos, pr){
   if(pos==='RB') return [['Carries',n(pr.rush_att)],['Rush yds',n(pr.rush_yd)],['Rush TD',n(pr.rush_td)],['Rec',n(pr.rec)],['Rec yds',n(pr.rec_yd)],['Rec TD',n(pr.rec_td)]];
   if(pos==='WR'||pos==='TE') return [['Rec',n(pr.rec)],['Rec yds',n(pr.rec_yd)],['Rec TD',n(pr.rec_td)]];
   if(pos==='DST') return [['Sacks',n(pr.sack)],['INT',n(pr.int)],['Fum rec',n(pr.fum_rec)]];
+  if(idpOk(pos)) return [['Tackles',n(pr.idp_tkl_solo)],['Assists',n(pr.idp_tkl_ast)],['Sacks',n(pr.idp_sack)],['INT',n(pr.idp_int)],['FF',n(pr.idp_ff)],['Fum rec',n(pr.idp_fum_rec)]];
   return [];
 }
 function openPlayer(id){
@@ -677,7 +723,7 @@ function openPlayer(id){
     </div>
     <div class="pd-facts">
       <div class="fact"><div class="v">#${p.liveRank||p.id}</div><div class="l">Rank</div></div>
-      <div class="fact" title="${adpTooltip(p.id)}"><div class="v">${p.adp}</div><div class="l">ADP</div></div>
+      <div class="fact" title="${adpTooltip(p.id)}"><div class="v">${liveAdpOrStatic(p)}</div><div class="l">ADP</div></div>
       <div class="fact"><div class="v">${tiers[p.id]}</div><div class="l">Tier</div></div>
       <div class="fact"><div class="v">${p.b||'—'}</div><div class="l">Bye</div></div>
     </div>
@@ -772,7 +818,7 @@ function openCompare(){
     `<div class="cmp-cell lab"></div>`+info.map(x=>
       `<div class="cmp-cell head" style="display:flex; flex-direction:column; align-items:center; gap:4px">${avatarHtml(x.p,'sm')}<div>${x.p.n}</div><span class="sub"><span class="posbadge ${posColor(x.p.p)}">${x.p.p}${x.p.pr}</span>${x.p.t}${x.st?(x.st==='mine'?' · MINE':' · GONE'):''}</span></div>`).join('')
     +rowH(`<span title="${ADP_TOOLTIP}">Consensus</span>`, info.map(x=>x.p.id), -1)
-    +rowH(`<span title="${info.every(x=>ENRICH[x.p.id]&&typeof ENRICH[x.p.id].live_adp==='number')?LIVE_ADP_TOOLTIP:ADP_TOOLTIP}">ADP</span>`, info.map(x=>x.p.adp), -1)
+    +rowH(`<span title="${info.every(x=>ENRICH[x.p.id]&&typeof ENRICH[x.p.id].live_adp==='number')?LIVE_ADP_TOOLTIP:ADP_TOOLTIP}">ADP</span>`, info.map(x=>liveAdpOrStatic(x.p)), -1)
     +rowH('Tier', info.map(x=>tiers[x.p.id]), -1)
     +rowH('Bye', info.map(x=>x.p.b||null), 0, info.map(x=>x.p.b&&myByes[x.p.b]?`⚠ ${myByes[x.p.b]} of yours`:''))
     +rowH('Injury', info.map(x=>{ const e=ENRICH[x.p.id]; return e?(e.injury_status||'Active'):null; }), 0)
@@ -823,7 +869,7 @@ function buildCompareText(){
     const p=PLAYERS.find(x=>x.id===id);
     const st=status[id]; const s=STATS[String(id)];
     const sc=scores.find(x=>x.p.id===id);
-    lines.push(`${i+1}. ${p.n} — ${p.p}${p.pr}, ${p.t}, bye ${p.b||'—'} · consensus #${p.id}, ADP ${p.adp}, Tier ${tiers[p.id]}${st?` · ALREADY DRAFTED (${st})`:''}`);
+    lines.push(`${i+1}. ${p.n} — ${p.p}${p.pr}, ${p.t}, bye ${p.b||'—'} · consensus #${p.id}, ADP ${liveAdpOrStatic(p)}, Tier ${tiers[p.id]}${st?` · ALREADY DRAFTED (${st})`:''}`);
     lines.push(`   2025: ${s?`${s.g} games, ${s.fp.toFixed(1)} PPR pts (${(s.fp/s.g).toFixed(1)}/g) — ${compact2025(id)}`:'no NFL stats (rookie or missed season)'}`);
     if(sc && sc.reasons.length) lines.push(`   App notes: ${sc.reasons.slice(0,3).map(r=>r.t).join('; ')}`);
   });
@@ -865,7 +911,8 @@ function renderLog(){
   const q=(S.ui.logQ||'').toLowerCase();
   list=list.filter(a=>{
     const p=PLAYERS.find(x=>x.id===a.id);
-    if(S.ui.logPos!=='ALL' && p.p!==S.ui.logPos) return false;
+    if(S.ui.logPos==='IDP'){ if(!idpOk(p.p)) return false; }
+    else if(S.ui.logPos!=='ALL' && p.p!==S.ui.logPos) return false;
     if(S.ui.logTeam==='MINE'){ if(a.kind!=='mine') return false; }
     else if(S.ui.logTeam!=='ALL' && teamOnClock(a.pick)!==Number(S.ui.logTeam)) return false;
     if(q && !(p.n.toLowerCase().includes(q) || p.t.toLowerCase().includes(q) || p.p.toLowerCase().includes(q))) return false;
@@ -950,7 +997,7 @@ function openAssignPick(pickNo){
         ${avatarHtml(p,'sm')}
         <span class="posbadge ${posColor(p.p)}">${p.p}${p.pr}</span>
         <span class="asgname">${p.n}</span>
-        <span class="asgmeta">${p.t} · ADP ${p.adp}</span>
+        <span class="asgmeta">${p.t} · ADP ${liveAdpOrStatic(p)}</span>
       </div>`).join('');
   };
   const wireRows=()=>{
@@ -1023,7 +1070,7 @@ document.querySelectorAll('.panebtns').forEach(el=>{
 function renderNeedsCard(){
   const el=$('needsCard'); if(!el) return;
   const {slots}=myRoster();
-  const pillsHtml=['QB','RB','WR','TE','K','DST'].map(pos=>{
+  const pillsHtml=['QB','RB','WR','TE','K','DST','IDP'].map(pos=>{
     const total=slots.filter(s=>s.pos===pos).length;
     if(!total) return '';
     const filled=slots.filter(s=>s.pos===pos && s.pl).length;
@@ -1048,7 +1095,7 @@ function renderFlowCard(){
   el.innerHTML=`<h3>Draft flow</h3><div class="flowtxt">${S.actions.length} of ${totalPicks()} picks logged. You hold slot ${S.slot}, so your picks run ${nxt}, and on down the snake.</div>`;
 }
 /* ---------- sidebar: positional trend ---------- */
-const TREND_POS_ORDER=['QB','RB','WR','TE','K','DST'];
+const TREND_POS_ORDER=['QB','RB','WR','TE','K','DST',...IDP_POSITIONS];
 function computeTrend(){
   const roundNums=[...new Set(S.actions.map(a=>roundOf(a.pick)))].sort((a,b)=>a-b);
   const rounds=roundNums.map(r=>{
@@ -1271,7 +1318,7 @@ function buildClaudeText(){
   const lines=[];
   lines.push(`FANTASY DRAFT — LIVE STATE`);
   lines.push(`League: ${S.teams}-team PPR snake, ${S.rounds} rounds. I draft from slot ${S.slot}.`);
-  lines.push(`Lineup: ${['QB','RB','WR','TE','FLEX','K','DST','BN'].map(k=>`${k}:${S.req[k]}`).join(' ')}`);
+  lines.push(`Lineup: ${['QB','RB','WR','TE','FLEX','K','DST','IDP','BN'].map(k=>`${k}:${S.req[k]}`).join(' ')}`);
   lines.push(`Current overall pick: ${S.pick} (Round ${Math.min(roundOf(Math.min(S.pick,totalPicks())),S.rounds)}). ${teamOnClock(Math.min(S.pick,totalPicks()))===S.slot&&S.pick<=totalPicks()?'IT IS MY PICK NOW.':''}`);
   lines.push(`My upcoming picks: ${nxt.length?nxt.map(x=>'#'+x).join(', '):'none left'}`);
   lines.push(``);
@@ -1282,7 +1329,7 @@ function buildClaudeText(){
   lines.push(`MY QUEUE (my own priority order): ${q.length?q.join(', '):'(empty)'}`);
   lines.push(``);
   lines.push(`TOP 30 AVAILABLE (my app's rank order · consensus rank, pos, team, bye, ADP, tier):`);
-  avail.forEach((r,i)=>lines.push(`${i+1}. ${r.p.n} — #${r.p.id} ${r.p.p}${r.p.pr} ${r.p.t} bye ${r.p.b||'—'} ADP ${r.p.adp} T${tiers[r.p.id]}`));
+  avail.forEach((r,i)=>lines.push(`${i+1}. ${r.p.n} — #${r.p.id} ${r.p.p}${r.p.pr} ${r.p.t} bye ${r.p.b||'—'} ADP ${liveAdpOrStatic(r.p)} T${tiers[r.p.id]}`));
   lines.push(``);
   lines.push(`LAST 12 PICKS: ${recent.join(' · ')||'none'}`);
   lines.push(``);
@@ -1412,6 +1459,7 @@ $('exLoad').onclick=()=>{
     const data=JSON.parse($('exText').value);
     if(!data.S || !Array.isArray(data.S.actions)) throw 0;
     S={...S, ...data.S, queue:data.S.queue||[], ui:S.ui, started:true};
+    S.req = {...DEF_REQ, ...S.req};
     rebuildStatus(); showApp(); renderAll();
     $('exModal').classList.remove('open'); toast('Draft restored');
   }catch(e){ toast('Could not read that save code'); }
@@ -1482,7 +1530,7 @@ $('toggleDrafted').onclick=()=>{ S.ui.hideDrafted=!S.ui.hideDrafted;
 $('showMore').onclick=()=>{ S.ui.shown+=50; renderBoard(); };
 (function(){
   const el=$('pfilters');
-  for(const pos of ['ALL','RB','WR','QB','TE','FLEX','K','DST']){
+  for(const pos of ['ALL','RB','WR','QB','TE','FLEX','K','DST','IDP']){
     const b=document.createElement('button'); b.className='pf'+(pos==='ALL'?' active':''); b.textContent=pos;
     b.onclick=()=>{ S.ui.pos=pos; S.ui.shown=50;
       el.querySelectorAll('.pf').forEach(x=>x.classList.toggle('active',x===b)); renderBoard(); };
@@ -1492,7 +1540,7 @@ $('showMore').onclick=()=>{ S.ui.shown+=50; renderBoard(); };
 /* ---------- draft log filters ---------- */
 (function(){
   const el=$('logPosFilters');
-  for(const pos of ['ALL','RB','WR','QB','TE','K','DST']){
+  for(const pos of ['ALL','RB','WR','QB','TE','K','DST','IDP']){
     const b=document.createElement('button'); b.className='pf'+(pos==='ALL'?' active':''); b.textContent=pos;
     b.onclick=()=>{ S.ui.logPos=pos;
       el.querySelectorAll('.pf').forEach(x=>x.classList.toggle('active',x===b)); renderLog(); };
