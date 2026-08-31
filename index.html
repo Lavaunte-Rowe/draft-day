@@ -102,6 +102,26 @@
         <button class="btn ghost cmpmode-btn" id="cmpMode">⚖ Compare</button>
       </div>
       <div class="pfilters" id="pfilters"></div>
+      <select id="sortBy" class="sortselect">
+        <option value="adp">Sort: ADP</option>
+        <optgroup label="2025 season (actual)">
+          <option value="25pts">2025 Fantasy pts</option>
+          <option value="25td">2025 Touchdowns (total)</option>
+          <option value="25rec">2025 Receptions</option>
+          <option value="25rushyd">2025 Rushing yds</option>
+          <option value="25recyd">2025 Receiving yds</option>
+          <option value="25totyd">2025 Total yds</option>
+        </optgroup>
+        <optgroup label="2026 projection">
+          <option value="projpts">2026 Proj. pts (generic)</option>
+          <option value="custompts">2026 Custom league pts</option>
+          <option value="projtd">2026 Proj. touchdowns (total)</option>
+          <option value="projrec">2026 Proj. receptions</option>
+          <option value="projrushyd">2026 Proj. rushing yds</option>
+          <option value="projrecyd">2026 Proj. receiving yds</option>
+          <option value="projtotyd">2026 Proj. total yds</option>
+        </optgroup>
+      </select>
       <div id="board" style="margin-top:8px"></div>
       <button class="showmore" id="showMore">Show more</button>
     </section>

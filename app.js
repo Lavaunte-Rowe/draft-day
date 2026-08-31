@@ -11,7 +11,7 @@ let S = {
   sideOrder:['needs','flow','reset','trend','notes'],
   teamNames:{},               // {teamNumber: 'Custom Name'} — set from Settings after the live draft
   ui:{tab:'draft', pos:'ALL', search:'', hideDrafted:true, shown:50, cmp:[], cmpActive:false,
-    logSort:'desc', logQ:'', logPos:'ALL', logTeam:'ALL', hotTakes:false}
+    logSort:'desc', logQ:'', logPos:'ALL', logTeam:'ALL', hotTakes:false, sortBy:'adp'}
 };
 function teamLabel(n, short){
   const custom = S.teamNames && S.teamNames[n];
@@ -599,6 +599,55 @@ function renderBuddyLatest(){
   strip.style.display='flex';
   $('blText').textContent=lastReply.content.split('\n')[0].slice(0,140);
 }
+// Sort-by helpers. 2025 values are parsed out of STATS[id].rows, which are
+// display-formatted strings ("3,668", "36/42") built for the player sheet —
+// not raw numbers, so they're parsed here rather than duplicating a numeric
+// copy of curated data. 2026 values read straight off the already-numeric
+// ENRICH[id].proj fields.
+function statNum(str){
+  if(str==null) return null;
+  const m=String(str).match(/-?[\d,]+(\.\d+)?/);
+  return m ? parseFloat(m[0].replace(/,/g,'')) : null;
+}
+function statsRowExact(s, label){
+  if(!s || !s.rows) return null;
+  const row=s.rows.find(r=>r[0].toLowerCase()===label.toLowerCase());
+  return row ? statNum(row[1]) : null;
+}
+function statsRowSum(s, labelPattern){
+  if(!s || !s.rows) return null;
+  let total=null;
+  for(const [label,val] of s.rows){
+    if(labelPattern.test(label)){ const n=statNum(val); if(n!=null) total=(total||0)+n; }
+  }
+  return total;
+}
+function projSum(pr, fields){
+  if(!pr) return null;
+  const parts=fields.map(f=>pr[f]).filter(v=>typeof v==='number');
+  return parts.length ? parts.reduce((a,b)=>a+b,0) : null;
+}
+function boardSortValue(p, key){
+  const s=STATS[String(p.id)];
+  const e=ENRICH[p.id];
+  const pr=e && e.proj;
+  switch(key){
+    case '25pts': return s ? s.fp : null;
+    case '25td': return statsRowSum(s, /td/i);
+    case '25rec': return statsRowExact(s, 'Rec');
+    case '25rushyd': return statsRowExact(s, 'Rush yds');
+    case '25recyd': return statsRowExact(s, 'Rec yds');
+    case '25totyd': return statsRowSum(s, /yds/i);
+    case 'projpts': return pr ? pr.pts_ppr : null;
+    case 'custompts': return pr ? pr.customPts : null;
+    case 'projtd': return projSum(pr, ['pass_td','rush_td','rec_td']);
+    case 'projrec': return pr ? pr.rec : null;
+    case 'projrushyd': return pr ? pr.rush_yd : null;
+    case 'projrecyd': return pr ? pr.rec_yd : null;
+    case 'projtotyd': return projSum(pr, ['pass_yd','rush_yd','rec_yd']);
+    default: return null;
+  }
+}
 function renderBoard(){
   const el=$('board'); el.innerHTML='';
   const q=S.ui.search.toLowerCase();
@@ -611,12 +660,19 @@ function renderBoard(){
     if(q && !(p.n.toLowerCase().includes(q)||p.t.toLowerCase().includes(q))) return false;
     return true;
   });
+  const adpSort = (a,b)=> (S.ui.pos==='IDP' ? liveAdpOrStatic(a)-liveAdpOrStatic(b) : a.adp-b.adp);
   // Filtered to IDP specifically: sort by their live ADP (Sleeper's adp_idp,
   // internally consistent within the IDP pool) instead of the static p.adp
   // placeholder that's deliberately never live-overwritten for them — see
   // loadEnrichment. Every other view sorts by p.adp as before.
-  if(S.ui.pos==='IDP') list.sort((a,b)=>liveAdpOrStatic(a)-liveAdpOrStatic(b));
-  else list.sort((a,b)=>a.adp-b.adp);
+  if(S.ui.sortBy==='adp' || !S.ui.sortBy) list.sort(adpSort);
+  else list.sort((a,b)=>{
+    const va=boardSortValue(a,S.ui.sortBy), vb=boardSortValue(b,S.ui.sortBy);
+    if(va==null && vb==null) return adpSort(a,b);
+    if(va==null) return 1;
+    if(vb==null) return -1;
+    return vb-va; // descending — higher stat value first
+  });
   const shown=list.slice(0,S.ui.shown);
   if(!list.length){
     const q2=S.ui.search;
@@ -1564,6 +1620,7 @@ $('search').oninput=e=>{ S.ui.search=e.target.value; S.ui.shown=50; renderBoard(
 $('toggleDrafted').onclick=()=>{ S.ui.hideDrafted=!S.ui.hideDrafted;
   $('toggleDrafted').textContent=S.ui.hideDrafted?'Hide drafted':'Show all'; renderBoard(); };
 $('showMore').onclick=()=>{ S.ui.shown+=50; renderBoard(); };
+$('sortBy').onchange=e=>{ S.ui.sortBy=e.target.value; renderBoard(); };
 (function(){
   const el=$('pfilters');
   for(const pos of ['ALL','RB','WR','QB','TE','FLEX','K','DST','IDP']){
