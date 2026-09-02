@@ -316,19 +316,38 @@ function liveAdpOrStatic(p){
 }
 /* ---------- tiers (ADP-gap based, per position) ---------- */
 const tiers = {};
+// Tier breaks must walk the exact same order as pr/liveRank (tieredLiveSort)
+// — otherwise a player's tier badge and positional rank can come from two
+// different orderings and visibly contradict each other. Within the live-ADP
+// segment, tier breaks use the original ADP-gap test; within the no-live-ADP
+// fallback segment (ranked by custom/projected points instead), an analogous
+// percentage-drop test on points; and crossing from one segment into the
+// other is always a tier boundary, since "has a real live market signal" vs
+// "doesn't" is itself a meaningful line.
 function computeTiers(){
   const byPos = {};
   for(const p of PLAYERS) { const g=rankGroupOf(p); (byPos[g]=byPos[g]||[]).push(p); }
+  const hasLiveAdp = p => ENRICH[p.id] && typeof ENRICH[p.id].live_adp==='number';
   for(const pos in byPos){
-    const list = byPos[pos].sort((a,b)=>liveAdpOrStatic(a)-liveAdpOrStatic(b));
+    const list = tieredLiveSort(byPos[pos]);
+    if(!list.length) continue;
     let t=1;
     tiers[list[0].id]=1;
     for(let i=1;i<list.length;i++){
-      const prevAdp=liveAdpOrStatic(list[i-1]), curAdp=liveAdpOrStatic(list[i]);
-      const gap=curAdp-prevAdp;
-      const thresh=Math.max(5, prevAdp*0.13);
-      if(gap>=thresh && t<12) t++;
-      tiers[list[i].id]=t;
+      const prev=list[i-1], cur=list[i];
+      const prevLive=hasLiveAdp(prev), curLive=hasLiveAdp(cur);
+      let bigGap;
+      if(prevLive && curLive){
+        const prevAdp=liveAdpOrStatic(prev), curAdp=liveAdpOrStatic(cur);
+        bigGap = (curAdp-prevAdp) >= Math.max(5, prevAdp*0.13);
+      } else if(!prevLive && !curLive && projValueFor(prev.id)!=null && projValueFor(cur.id)!=null){
+        const pv=projValueFor(prev.id), cv=projValueFor(cur.id);
+        bigGap = pv>0 && ((pv-cv)/pv) >= 0.15;
+      } else {
+        bigGap = true; // segment boundary (live ADP -> fallback, or into the no-signal tail)
+      }
+      if(bigGap && t<12) t++;
+      tiers[cur.id]=t;
     }
   }
 }
