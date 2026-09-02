@@ -324,6 +324,15 @@ const tiers = {};
 // percentage-drop test on points; and crossing from one segment into the
 // other is always a tier boundary, since "has a real live market signal" vs
 // "doesn't" is itself a meaningful line.
+// MAX_TIER_SIZE is a hard cap, independent of the gap test below: the
+// percentage-of-ADP gap threshold (13%) requires an ever-larger absolute gap
+// as ADP climbs, so on a deep position like WR (100+ rosterable players
+// packed within a few ADP points of each other past the top tier) it can
+// go 80+ players without ever firing — verified against live data, this
+// produced an 84-player "Tier 1" for WR before this cap existed. The cap
+// guarantees no tier ever balloons like that again, while the gap test still
+// gets first crack at breaking tiers earlier wherever a real cliff exists.
+const MAX_TIER_SIZE = 8;
 function computeTiers(){
   const byPos = {};
   for(const p of PLAYERS) { const g=rankGroupOf(p); (byPos[g]=byPos[g]||[]).push(p); }
@@ -331,7 +340,7 @@ function computeTiers(){
   for(const pos in byPos){
     const list = tieredLiveSort(byPos[pos]);
     if(!list.length) continue;
-    let t=1;
+    let t=1, sizeInTier=1;
     tiers[list[0].id]=1;
     for(let i=1;i<list.length;i++){
       const prev=list[i-1], cur=list[i];
@@ -346,7 +355,8 @@ function computeTiers(){
       } else {
         bigGap = true; // segment boundary (live ADP -> fallback, or into the no-signal tail)
       }
-      if(bigGap && t<12) t++;
+      if((bigGap || sizeInTier>=MAX_TIER_SIZE) && t<12){ t++; sizeInTier=0; }
+      sizeInTier++;
       tiers[cur.id]=t;
     }
   }
